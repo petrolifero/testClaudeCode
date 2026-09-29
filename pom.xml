@@ -14,6 +14,7 @@
     <module>comum</module>
     <module>academico</module>
     <module>nativo</module>
+    <module>api</module>
   </modules>
 
   <properties>
