@@ -1,4 +1,11 @@
-package br.leds.comum;
+package br.leds.comum.csv;
+
+import br.leds.comum.dominio.Candidato;
+import br.leds.comum.dominio.Concurso;
+import br.leds.comum.dominio.Cpf;
+import br.leds.comum.erro.EntradaInvalida;
+import br.leds.comum.erro.ErroAplicacao;
+
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -37,7 +44,7 @@ public final class CsvLeitor {
                         Cpf.normalizar(campos.get(2)),
                         lista(campos.get(3))));
             } catch (DateTimeParseException e) {
-                throw new ErroAplicacao("Data inválida '" + campos.get(1) + "'", e);
+                throw new EntradaInvalida("Data inválida '" + campos.get(1) + "'", e);
             }
         });
         return resultado;
@@ -53,7 +60,7 @@ public final class CsvLeitor {
                         Long.parseLong(campos.get(2).trim()),
                         lista(campos.get(3))));
             } catch (NumberFormatException e) {
-                throw new ErroAplicacao("Código de concurso inválido '" + campos.get(2) + "'", e);
+                throw new EntradaInvalida("Código de concurso inválido '" + campos.get(2) + "'", e);
             }
         });
         return resultado;
@@ -63,7 +70,7 @@ public final class CsvLeitor {
     static List<String> lista(String campo) {
         String texto = campo.trim();
         if (!texto.startsWith("[") || !texto.endsWith("]")) {
-            throw new ErroAplicacao("Lista deve estar entre colchetes: '" + campo + "'");
+            throw new EntradaInvalida("Lista deve estar entre colchetes: '" + campo + "'");
         }
         LinkedHashSet<String> itens = new LinkedHashSet<>();
         for (String item : texto.substring(1, texto.length() - 1).split(",")) {
@@ -108,7 +115,7 @@ public final class CsvLeitor {
         try (BufferedReader leitor = Files.newBufferedReader(arquivo, StandardCharsets.UTF_8)) {
             String linha = leitor.readLine(); // cabeçalho
             if (linha == null) {
-                throw new ErroAplicacao("Arquivo vazio: " + arquivo);
+                throw new EntradaInvalida("Arquivo vazio: " + arquivo);
             }
             int numero = 1;
             while ((linha = leitor.readLine()) != null) {
@@ -118,17 +125,17 @@ public final class CsvLeitor {
                 }
                 List<String> campos = dividir(linha);
                 if (campos.size() != colunas) {
-                    throw new ErroAplicacao(arquivo + ":" + numero + ": esperado " + colunas
+                    throw new EntradaInvalida(arquivo + ":" + numero + ": esperado " + colunas
                             + " colunas, encontrado " + campos.size());
                 }
                 try {
                     processador.processar(numero, campos);
-                } catch (ErroAplicacao e) {
-                    throw new ErroAplicacao(arquivo + ":" + numero + ": " + e.getMessage(), e);
+                } catch (EntradaInvalida e) {
+                    throw new EntradaInvalida(arquivo + ":" + numero + ": " + e.getMessage(), e);
                 }
             }
         } catch (NoSuchFileException e) {
-            throw new ErroAplicacao("Arquivo não encontrado: " + arquivo, e);
+            throw new EntradaInvalida("Arquivo não encontrado: " + arquivo, e);
         } catch (IOException e) {
             throw new ErroAplicacao("Falha ao ler " + arquivo + ": " + e.getMessage(), e);
         }

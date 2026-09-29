@@ -1,4 +1,4 @@
-package br.leds.comum;
+package br.leds.comum.dominio;
 
 import java.time.LocalDate;
 import java.util.List;

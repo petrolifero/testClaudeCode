@@ -1,8 +1,12 @@
-package br.leds.comum;
+package br.leds.comum.csv;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import br.leds.comum.dominio.Candidato;
+import br.leds.comum.dominio.Concurso;
+import br.leds.comum.erro.ErroAplicacao;
+import br.leds.comum.erro.EntradaInvalida;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;

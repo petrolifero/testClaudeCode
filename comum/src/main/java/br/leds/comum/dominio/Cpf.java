@@ -1,4 +1,6 @@
-package br.leds.comum;
+package br.leds.comum.dominio;
+
+import br.leds.comum.erro.EntradaInvalida;
 
 /** Utilitários de CPF. Não valida dígitos verificadores: os dados de exemplo são fictícios. */
 public final class Cpf {
@@ -10,7 +12,7 @@ public final class Cpf {
     public static String normalizar(String texto) {
         String digitos = texto == null ? "" : texto.replaceAll("\\D", "");
         if (digitos.length() != 11) {
-            throw new ErroAplicacao("CPF inválido (esperado 11 dígitos): '" + texto + "'");
+            throw new EntradaInvalida("CPF inválido (esperado 11 dígitos): '" + texto + "'");
         }
         return digitos;
     }
