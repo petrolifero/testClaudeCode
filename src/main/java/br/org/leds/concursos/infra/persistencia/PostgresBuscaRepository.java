@@ -21,11 +21,11 @@ import java.util.List;
 @Repository
 public class PostgresBuscaRepository implements BuscaRepository {
 
-    private static final String EXISTE_CANDIDATO = "SELECT EXISTS (SELECT 1 FROM candidato WHERE cpf = :cpf)";
+    static final String EXISTE_CANDIDATO = "SELECT EXISTS (SELECT 1 FROM candidato WHERE cpf = :cpf)";
 
-    private static final String EXISTE_CONCURSO = "SELECT EXISTS (SELECT 1 FROM concurso WHERE codigo = :codigo)";
+    static final String EXISTE_CONCURSO = "SELECT EXISTS (SELECT 1 FROM concurso WHERE codigo = :codigo)";
 
-    private static final String CONCURSOS_COMPATIVEIS = """
+    static final String CONCURSOS_COMPATIVEIS = """
             SELECT DISTINCT o.sigla AS orgao, c.codigo, c.edital
               FROM concurso c
               JOIN orgao o ON o.id = c.orgao_id
@@ -43,7 +43,7 @@ public class PostgresBuscaRepository implements BuscaRepository {
      * que têm alguma delas. Os dois IN viram semi-joins, evitando multiplicar linhas quando a mesma
      * profissão aparece em vários concursos do código.
      */
-    private static final String CANDIDATOS_COMPATIVEIS = """
+    static final String CANDIDATOS_COMPATIVEIS = """
             SELECT ca.nome, ca.data_nascimento, ca.cpf
               FROM candidato ca
              WHERE ca.id IN (SELECT cp.candidato_id

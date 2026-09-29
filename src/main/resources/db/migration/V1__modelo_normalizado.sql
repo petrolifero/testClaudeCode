@@ -21,9 +21,12 @@ CREATE TABLE orgao (
     CONSTRAINT uk_orgao_sigla UNIQUE (sigla)
 );
 
+-- CPF e código usam varchar(11) + CHECK, e não char(11): comparar char(n) com um
+-- parâmetro text faz o PostgreSQL converter a coluna (cpf::text = $1) e o índice
+-- deixa de ser usado. Com varchar o índice serve para parâmetros text e varchar.
 CREATE TABLE candidato (
     id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    cpf             char(11)     NOT NULL,
+    cpf             varchar(11)  NOT NULL,
     nome            varchar(200) NOT NULL,
     data_nascimento date         NOT NULL,
     CONSTRAINT uk_candidato_cpf UNIQUE (cpf),  -- também é o índice da busca 1
@@ -36,7 +39,7 @@ CREATE TABLE concurso (
     id       bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     orgao_id integer     NOT NULL,
     edital   varchar(20) NOT NULL,
-    codigo   char(11)    NOT NULL,
+    codigo   varchar(11) NOT NULL,
     CONSTRAINT fk_concurso_orgao FOREIGN KEY (orgao_id) REFERENCES orgao (id),
     CONSTRAINT ck_concurso_codigo CHECK (codigo ~ '^[0-9]{11}$')
 );

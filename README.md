@@ -1,7 +1,7 @@
 # Desafio Backend LEDS — versão **acadêmica / normalizada**
 
 > 🤖 **Feito pelo Claude Opus 5.5 (esforço médio)** — branch `opus-5.5-medio/academico-normalizado`.
-> Existe uma branch irmã, `opus-5.5-medio/postgres-arrays`, com **a mesma API e os mesmos testes**,
+> Existe uma branch irmã, `opus-5.5-medio/postgres-arrays`, com **a mesma API e os mesmos testes funcionais**,
 > mudando só o modelo de dados (arrays nativos + GIN). Assim dá para comparar as duas abordagens lado a lado.
 
 Serviço REST em **Java 21 + Spring Boot 3.5 + PostgreSQL 16** que resolve o
@@ -19,7 +19,7 @@ Serviço REST em **Java 21 + Spring Boot 3.5 + PostgreSQL 16** que resolve o
 - [API](#api)
 - [Modelo de dados (3FN)](#modelo-de-dados-3fn)
 - [Consultas e índices](#consultas-e-índices)
-- [Desempenho medido](#desempenho-medido)
+- [Desempenho medido (e comparação com a versão com arrays)](#desempenho-medido)
 - [Observações sobre os dados](#observações-sobre-os-dados)
 - [Arquitetura do código](#arquitetura-do-código)
 - [Tratamento de erros](#tratamento-de-erros)
@@ -85,8 +85,8 @@ O órgão também foi extraído para sua própria tabela.
 |---|---|---|
 | `profissao` | `id`, `nome` | PK `id`; `UNIQUE(nome)` |
 | `orgao` | `id`, `sigla` | PK `id`; `UNIQUE(sigla)` |
-| `candidato` | `id`, `cpf char(11)`, `nome`, `data_nascimento date` | PK `id`; `UNIQUE(cpf)`; `CHECK` 11 dígitos |
-| `concurso` | `id`, `orgao_id`, `edital`, `codigo char(11)` | PK `id`; FK órgão; `CHECK` 11 dígitos |
+| `candidato` | `id`, `cpf varchar(11)`, `nome`, `data_nascimento date` | PK `id`; `UNIQUE(cpf)`; `CHECK` 11 dígitos |
+| `concurso` | `id`, `orgao_id`, `edital`, `codigo varchar(11)` | PK `id`; FK órgão; `CHECK` 11 dígitos |
 | `candidato_profissao` | `candidato_id`, `profissao_id` | PK composta; FKs |
 | `concurso_vaga` | `concurso_id`, `profissao_id` | PK composta; FKs |
 
@@ -130,24 +130,55 @@ SELECT ca.nome, ca.data_nascimento, ca.cpf
 ```
 A primeira versão da busca 2 usava `EXISTS` com join direto `candidato_profissao ⋈ concurso_vaga`;
 como a mesma profissão aparece em vários concursos do mesmo código, isso multiplicava as linhas
-intermediárias (735 mil × 3 no teste abaixo). A versão com `IN` aninhado deduplica antes e foi ~12% mais rápida nesta medição.
+intermediárias (735 mil × 3 no volume sintético abaixo). A versão com `IN` aninhado deduplica antes e foi
+~12% mais rápida nessa medição.
 
 ## Desempenho medido
 
-Os 1000 registros oficiais cabem em poucas páginas, então o planejador usa *seq scan* em tudo e os
-índices não mudam nada. Para avaliar de verdade, [`scripts/volume-sintetico.sql`](scripts/volume-sintetico.sql)
-gera **1 000 000 de candidatos** (1,89 M linhas em `candidato_profissao`) e **100 000 concursos**
-(230 mil vagas, 5 concursos por código). PostgreSQL 16, configuração padrão, `EXPLAIN (ANALYZE, BUFFERS)`:
+Os 1000 registros oficiais cabem em poucas páginas: o planejador usa *seq scan* em tudo e índices não
+fazem diferença. Para medir de verdade:
 
-| Busca | Plano (resumo) | Linhas retornadas | Tempo |
-|---|---|---|---|
-| 1 — por CPF | Index Scan `uk_candidato_cpf` → Index Only Scan PK → Index Only Scan `ix_concurso_vaga_inv` → Hash Semi Join com `concurso` | 19 083 | **~72 ms** |
-| 2 — por código | Bitmap Index Scan `ix_concurso_codigo` → Index Only Scan `pk_concurso_vaga` → Parallel Hash Semi Join com `candidato_profissao`/`candidato` + sort | 890 884 | **~1,6 s** |
+- [`scripts/volume-sintetico.sql`](scripts/volume-sintetico.sql) gera **1 000 000 de candidatos**
+  (1,89 M pares candidato–profissão) e **100 000 concursos** (230 mil vagas, 5 concursos por código),
+  12 profissões — mesma distribuição nas duas branches;
+- para a comparação abaixo, os dados do modelo com arrays foram montados **a partir das mesmas linhas**
+  do modelo normalizado (mesmo banco, schemas diferentes), então as duas versões respondem exatamente
+  as mesmas perguntas sobre exatamente os mesmos dados;
+- [`scripts/benchmark/`](scripts/benchmark) tem os roteiros do `pgbench` (CPF/código sorteados a cada
+  execução): `pgbench -n -t 300 -f scripts/benchmark/busca1.sql <banco>` (busca 2 com `-t 15`).
 
-Leitura honesta dos números: com só 12 profissões a seletividade é baixíssima — um código de concurso
-com 3–4 profissões casa com ~89% dos candidatos. Nesse cenário ler a tabela inteira **é** o plano
-ótimo, e o tempo da busca 2 é dominado por materializar e ordenar quase 900 mil linhas. Numa API real
-isso pediria paginação; aqui mantive a resposta completa porque é o que o enunciado pede.
+PostgreSQL 16, configuração padrão, latência média de 2 rodadas:
+
+| | Normalizado (3FN) | Arrays + GIN |
+|---|---|---|
+| **Busca 1** — por CPF (~19 mil concursos retornados) | 111 ms | **75–83 ms** |
+| **Busca 2** — por código (~850 mil candidatos retornados) | 1,40–1,49 s | **1,28–1,40 s** |
+| Espaço em disco (tabelas + índices) | 352 MB | **195 MB** |
+| Tabelas / índices | 6 / 11 | 2 / 5 |
+
+O que os números dizem:
+
+1. **Busca 1**: no modelo normalizado são 4 passos (CPF → profissões → `concurso_vaga` → `concurso`,
+   com semi-join); com arrays são 2 (CPF → `profissoes`; GIN em `vagas`). O GIN ganhou do *seq scan*
+   (75 ms × 101 ms com o bitmap desligado).
+2. **Busca 2** é dominada pelo tamanho da resposta: com só 12 profissões, um código com 3–4 profissões
+   casa com ~85% dos candidatos, e o tempo vai em materializar e ordenar ~850 mil linhas. Nesse nível de
+   seletividade **nenhum índice ajuda de verdade** — forçando *seq scan* na versão com arrays ela cai para
+   ~1,0 s, porque o planejador não enxerga o valor vindo da subconsulta (InitPlan) e aposta no GIN.
+   Numa API real essa rota pediria paginação; mantive a resposta completa porque é o que o enunciado pede.
+3. **Espaço**: cada par candidato–profissão no modelo normalizado é uma tupla (~24 bytes de cabeçalho)
+   mais entradas em dois índices B-tree; no array é um elemento dentro da mesma linha, e o GIN comprime
+   as *posting lists*.
+4. **Armadilha encontrada no caminho (versão normalizada)**: com `char(11)`, comparar com um parâmetro
+   `text` faz o PostgreSQL converter a *coluna* (`cpf::text = $1`) e o índice deixa de ser usado
+   (111 ms → 463 ms). O driver JDBC manda `varchar` e escapava por sorte; a coluna virou `varchar(11)` e
+   o `PlanosDeExecucaoTest` passou a proteger contra regressões desse tipo.
+
+Trade-offs que não aparecem no cronômetro: o modelo normalizado garante integridade referencial das
+profissões (não existe "marceneiro" e "marcenero" por erro de digitação sem alguém notar), permite
+renomear uma profissão num lugar só e responde facilmente perguntas como "quantos candidatos por
+profissão". O modelo com arrays espelha o arquivo, é menor e mais rápido para *estas* duas buscas, e
+a validação fica nos `DOMAIN`s — mas renomear uma profissão exige `array_replace` em todas as linhas.
 
 ## Observações sobre os dados
 
@@ -205,6 +236,7 @@ TEST_DATABASE_URL=jdbc:postgresql://localhost:5432/leds_test mvn verify   # usa 
 |---|---|---|
 | Unitários | `CpfTest`, `CodigoConcursoTest`, `ProfissoesTest`, `LeitorArquivosTest`, `BuscaServiceTest` | validações, parser, regras de 404 |
 | Web | `BuscaControllerTest` (`@WebMvcTest`) | rotas, JSON, 400/404/503 |
+| Banco | `PlanosDeExecucaoTest` | as consultas continuam conseguindo usar os índices projetados |
 | Integração | `BuscaRepositoryIntegracaoTest` | carrega os arquivos oficiais e compara **as 1000 buscas por CPF e as 199 por código** com um oráculo de força bruta em memória |
 | Comportamentais | `busca.feature` (Cucumber, em português) | o exemplo do enunciado, via HTTP real |
 
