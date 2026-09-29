@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: concursos
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/leds}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+  flyway:
+    locations: classpath:db/migration
+  mvc:
+    problemdetails:
+      enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
+app:
+  importacao:
+    habilitada: ${IMPORTACAO_HABILITADA:true}
+    candidatos: ${ARQUIVO_CANDIDATOS:classpath:dados/candidatos.txt}
+    concursos: ${ARQUIVO_CONCURSOS:classpath:dados/concursos.txt}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
