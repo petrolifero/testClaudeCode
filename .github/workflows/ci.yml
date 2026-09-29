@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # histórico completo melhora a análise do SonarQube
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Testes unitários, de integração (Testcontainers + PostgreSQL) e comportamentais (Cucumber)
+      - name: Build e testes
+        run: mvn -B verify
+
+      # Só roda se o segredo SONAR_TOKEN e as variáveis SONAR_ORGANIZATION/SONAR_PROJECT_KEY existirem
+      - name: Análise SonarCloud
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: >
+          mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+          -Dsonar.host.url=https://sonarcloud.io
+          -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+          -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relatorios-de-teste
+          path: |
+            target/surefire-reports
+            target/site/jacoco
