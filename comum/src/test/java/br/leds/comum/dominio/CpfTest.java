@@ -1,8 +1,9 @@
-package br.leds.comum;
+package br.leds.comum.dominio;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import br.leds.comum.erro.EntradaInvalida;
 import org.junit.jupiter.api.Test;
 
 class CpfTest {
@@ -15,7 +16,7 @@ class CpfTest {
 
     @Test
     void rejeitaTamanhoErrado() {
-        assertThrows(ErroAplicacao.class, () -> Cpf.normalizar("123"));
-        assertThrows(ErroAplicacao.class, () -> Cpf.normalizar(null));
+        assertThrows(EntradaInvalida.class, () -> Cpf.normalizar("123"));
+        assertThrows(EntradaInvalida.class, () -> Cpf.normalizar(null));
     }
 }

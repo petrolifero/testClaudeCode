@@ -54,6 +54,29 @@ java -jar nativo/target/nativo.jar gerar 200000 100000 /tmp/gen      # CSVs sint
 java -jar nativo/target/nativo.jar importar /tmp/gen/candidatos.csv /tmp/gen/concursos.csv
 ```
 
+## Arquitetura (módulo `comum`)
+
+```
+dominio     records e regras puras (Candidato, Concurso, Cpf)
+erro        ErroAplicacao ─┬─ EntradaInvalida       (culpa do usuário/arquivo)
+                           └─ ErroInfraestrutura    (banco, recurso ausente)
+aplicacao   portas ConsultasConcursos (leitura) e CargaDados (escrita), Modelagem,
+            serviços ServicoConsultas e ServicoImportacao (casos de uso)
+csv         CsvLeitor, Gerador
+jdbc        ConsultasJdbc (execução JDBC; recebe só o SQL), ConfiguracaoBanco, FabricaDataSource
+cli         Cli + um Comando por subcomando
+```
+
+* **S** — parser, casos de uso, execução JDBC, formatação da CLI e SQL de cada modelagem são classes distintas.
+* **O** — novo subcomando = nova classe `Comando`; nova modelagem = novo módulo com uma `Modelagem`
+  registrada em `META-INF/services` (a API/CLI a descobrem via `ServiceLoader`).
+* **L** — `ConsultasAcademico` e `ConsultasNativo` são intercambiáveis atrás de `ConsultasConcursos`.
+* **I** — quem só consulta (CLI, futura API) depende de `ConsultasConcursos`, sem ver carga de dados.
+* **D** — serviços dependem das portas; repositórios recebem um `javax.sql.DataSource`; cada `Main` é a única
+  raiz de composição que conhece classes concretas.
+* Toda validação de entrada (CPF, código) fica em `ServicoConsultas`, então qualquer porta de entrada
+  herda as mesmas regras; `EntradaInvalida` × `ErroInfraestrutura` permite traduzir erros por canal.
+
 ## Modelagem
 
 ### Acadêmica ([`schema.sql`](academico/src/main/resources/schema.sql))
@@ -113,4 +136,4 @@ Resultados idênticos nas duas soluções (mesmas contagens e conteúdo). Observ
 * Arquivo inexistente, coluna faltando, data/CPF/código inválidos → mensagem com `arquivo:linha`, código de saída 1.
 * Importação transacional: se algo falha (ex.: CPF duplicado), nada é gravado.
 * Listas são normalizadas (minúsculas, sem espaços extras, sem repetição).
-* `mvn test` roda os testes unitários do parser e do CPF (`comum`).
+* `mvn test` roda os testes unitários (parser, CPF, serviços e CLI com dublês, sem banco) em `comum`.

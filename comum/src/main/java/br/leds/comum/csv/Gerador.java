@@ -1,4 +1,8 @@
-package br.leds.comum;
+package br.leds.comum.csv;
+
+import br.leds.comum.dominio.Cpf;
+import br.leds.comum.erro.ErroAplicacao;
+
 
 import java.io.BufferedWriter;
 import java.io.IOException;
