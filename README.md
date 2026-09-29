@@ -7,6 +7,7 @@ implementada duas vezes no mesmo repositório para comparar modelagens:
 |---|---|---|
 | [`academico`](academico) | 3ª forma normal | tabelas `profissao`, `candidato_profissao`, `concurso_vaga` (N:N) |
 | [`nativo`](nativo) | tipos ricos do PostgreSQL | colunas `text[]` iguais ao CSV + índices **GIN** |
+| [`api`](api) | API REST (Spring Boot) | usa qualquer uma das duas, escolhida por configuração |
 
 O módulo [`comum`](comum) tem o que é igual nas duas: leitura/validação dos CSVs, CLI, gerador de dados e a interface
 `RepositorioConcursos`. Só a camada de banco muda — então a comparação é justa.
@@ -27,17 +28,17 @@ Requisitos: JDK 17+, Maven, Docker (ou um PostgreSQL 14+ próprio).
 
 ```bash
 docker compose up -d                 # PostgreSQL com dois bancos: "academico" e "nativo"
-mvn package                          # compila, testa e gera academico/target/academico.jar e nativo/target/nativo.jar
+mvn package                          # compila, testa e gera academico/target/academico-exe.jar, nativo/target/nativo-exe.jar e api/target/api.jar
 
 # --- solução acadêmica ---
-java -jar academico/target/academico.jar importar dados/candidatos.csv dados/concursos.csv
-java -jar academico/target/academico.jar concursos-por-cpf 438.150.926-98
-java -jar academico/target/academico.jar candidatos-por-concurso 19750532858
+java -jar academico/target/academico-exe.jar importar dados/candidatos.csv dados/concursos.csv
+java -jar academico/target/academico-exe.jar concursos-por-cpf 438.150.926-98
+java -jar academico/target/academico-exe.jar candidatos-por-concurso 19750532858
 
 # --- solução nativa (mesmos comandos) ---
-java -jar nativo/target/nativo.jar importar dados/candidatos.csv dados/concursos.csv
-java -jar nativo/target/nativo.jar concursos-por-cpf 438.150.926-98
-java -jar nativo/target/nativo.jar candidatos-por-concurso 19750532858
+java -jar nativo/target/nativo-exe.jar importar dados/candidatos.csv dados/concursos.csv
+java -jar nativo/target/nativo-exe.jar concursos-por-cpf 438.150.926-98
+java -jar nativo/target/nativo-exe.jar candidatos-por-concurso 19750532858
 ```
 
 Os projetos usam **bancos separados** no mesmo servidor, então podem ser executados em qualquer ordem, quantas vezes
@@ -50,9 +51,31 @@ Os arquivos em [`dados/`](dados) são apenas as 9 primeiras linhas de cada CSV d
 Para testar com volume:
 
 ```bash
-java -jar nativo/target/nativo.jar gerar 200000 100000 /tmp/gen      # CSVs sintéticos, mesmo formato
-java -jar nativo/target/nativo.jar importar /tmp/gen/candidatos.csv /tmp/gen/concursos.csv
+java -jar nativo/target/nativo-exe.jar gerar 200000 100000 /tmp/gen      # CSVs sintéticos, mesmo formato
+java -jar nativo/target/nativo-exe.jar importar /tmp/gen/candidatos.csv /tmp/gen/concursos.csv
 ```
+
+## API REST
+
+A API expõe as mesmas duas consultas e usa **qualquer** das modelagens, escolhida por variável de ambiente
+(as duas ficam no classpath e são descobertas via `ServiceLoader`):
+
+```bash
+CONCURSOS_MODELAGEM=academico java -jar api/target/api.jar     # ou nativo; padrão: academico; PORT padrão 8080
+
+curl localhost:8080/api/candidatos/438.150.926-98/concursos    # CPF com ou sem pontuação
+curl localhost:8080/api/concursos/19750532858/candidatos
+```
+
+| Método e caminho | Resposta 200 |
+|---|---|
+| `GET /api/candidatos/{cpf}/concursos` | `[{"orgao":"PMES","edital":"6/2022","codigo":53691664314}, ...]` |
+| `GET /api/concursos/{codigo}/candidatos` | `[{"nome":"Ana Sophia Araújo","dataNascimento":"2004-12-18","cpf":"438.150.926-98"}, ...]` |
+
+Erros seguem RFC 7807 (`application/problem+json`): **400** para CPF/código inválido (mesmas mensagens da CLI) e
+**503** quando o banco falha (o detalhe técnico vai só para o log). Um CPF/código sem correspondência devolve `200` com lista vazia.
+A conexão usa as mesmas variáveis da CLI (`DB_URL`, `DB_USER`, `DB_PASSWORD`) através de um pool HikariCP.
+As respostas não são paginadas; com bases grandes uma consulta pode devolver dezenas de milhares de itens.
 
 ## Arquitetura (módulo `comum`)
 
@@ -66,6 +89,10 @@ csv         CsvLeitor, Gerador
 jdbc        ConsultasJdbc (execução JDBC; recebe só o SQL), ConfiguracaoBanco, FabricaDataSource
 cli         Cli + um Comando por subcomando
 ```
+
+O módulo `api` é outro adaptador de entrada: `ConsultasController` (HTTP) → `ServicoConsultas` → porta
+`ConsultasConcursos`; `TratadorErros` traduz `EntradaInvalida`/`ErroInfraestrutura` em 400/503 e
+`ConfiguracaoAplicacao` é sua raiz de composição. Nenhuma classe de `comum` precisou mudar para isso.
 
 * **S** — parser, casos de uso, execução JDBC, formatação da CLI e SQL de cada modelagem são classes distintas.
 * **O** — novo subcomando = nova classe `Comando`; nova modelagem = novo módulo com uma `Modelagem`
@@ -136,4 +163,4 @@ Resultados idênticos nas duas soluções (mesmas contagens e conteúdo). Observ
 * Arquivo inexistente, coluna faltando, data/CPF/código inválidos → mensagem com `arquivo:linha`, código de saída 1.
 * Importação transacional: se algo falha (ex.: CPF duplicado), nada é gravado.
 * Listas são normalizadas (minúsculas, sem espaços extras, sem repetição).
-* `mvn test` roda os testes unitários (parser, CPF, serviços e CLI com dublês, sem banco) em `comum`.
+* `mvn test` roda os testes unitários (parser, CPF, serviços e CLI com dublês, sem banco) em `comum` e os da camada HTTP (MockMvc, também sem banco) em `api`.
