@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="cabeca(titulo)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${titulo} + ' · gupyclone'">gupyclone</title>
+    <link rel="stylesheet" th:href="@{/css/gupy.css}">
+</head>
+<body>
+
+<!--/*
+  O canto superior direito é o que o enunciado descreve: deslogado, as três
+  pessoas; logado, quem entrou e o botão de sair, sem nenhuma opção de trocar
+  de pessoa. A lista de personas vem vazia quando há alguém autenticado, então
+  os formulários de entrar não existem no HTML — não ficam apenas escondidos.
+*/-->
+<header th:fragment="topo" class="topo">
+    <a class="marca" th:href="@{/}">gupy<strong>clone</strong></a>
+
+    <nav class="menu" th:if="${cabecalho.autenticado}">
+        <a th:href="@{/vagas}">Vagas</a>
+        <a th:if="${cabecalho.ehCandidato}" th:href="@{/minhas-candidaturas}">Minhas candidaturas</a>
+        <a th:if="${cabecalho.ehRh}" th:href="@{/rh/vagas}">Minhas vagas</a>
+        <a th:if="${cabecalho.ehRh}" th:href="@{/rh/vagas/nova}">Publicar vaga</a>
+    </nav>
+
+    <div class="canto">
+        <span class="convite" th:if="${!cabecalho.autenticado}">Entrar como</span>
+
+        <form th:each="persona : ${cabecalho.personas}"
+              method="post"
+              th:action="@{/auth/entrar/{chave}(chave=${persona.chave})}">
+            <button type="submit" class="pessoa"
+                    th:title="'Entrar como ' + ${persona.nome}"
+                    th:data-chave="${persona.chave}">
+                <span class="inicial" th:text="${#strings.substring(persona.nome, 0, 1)}">A</span>
+                <span class="pessoa-nome" th:text="${#strings.substringBefore(persona.nome, ' ')}">Nome</span>
+                <span class="pessoa-papel" th:text="${persona.papel.name() == 'RH'} ? 'RH' : 'Candidato'">Papel</span>
+            </button>
+        </form>
+
+        <div class="sessao" th:if="${cabecalho.autenticado}">
+            <span class="quem">
+                <span class="quem-nome" th:text="${cabecalho.nome}">Nome</span>
+                <span class="quem-papel" th:text="${cabecalho.papel}">Papel</span>
+            </span>
+            <form method="post" th:action="@{/auth/sair}">
+                <button type="submit" class="sair">Sair</button>
+            </form>
+        </div>
+    </div>
+</header>
+
+<!--/* Recados de sucesso e de erro, iguais em todas as páginas. */-->
+<div th:fragment="recados" class="recados">
+    <p class="recado sucesso" th:if="${sucesso}" th:text="${sucesso}"></p>
+    <p class="recado erro" th:if="${erro}" th:text="${erro}"></p>
+    <p class="recado aviso" th:if="${aviso}" th:text="${aviso}"></p>
+</div>
+
+</body>
+</html>

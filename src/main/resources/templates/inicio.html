@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/cabecalho :: cabeca('Início')}"></head>
+<body>
+<header th:replace="~{fragmentos/cabecalho :: topo}"></header>
+
+<main>
+    <div th:replace="~{fragmentos/cabecalho :: recados}"></div>
+
+    <section class="heroi">
+        <h1>Vagas que combinam com você</h1>
+        <p class="chamada">
+            O RH publica a vaga com os critérios de aceite. Você envia o currículo em PDF.
+            A triagem lê o currículo — inclusive quando a página é imagem digitalizada — e
+            devolve a resposta com o motivo, por e-mail.
+        </p>
+
+        <p class="instrucao" th:if="${!cabecalho.autenticado}">
+            Não existe cadastro nem senha: escolha uma das três pessoas no canto superior
+            direito para entrar.
+        </p>
+        <p class="instrucao" th:if="${cabecalho.autenticado}">
+            <a class="botao" th:href="@{/vagas}">Ver as vagas abertas</a>
+        </p>
+    </section>
+
+    <section class="como">
+        <h2>Como funciona</h2>
+        <ol class="passos">
+            <li>
+                <h3>Ana, do RH</h3>
+                <p>Publica a vaga e define os critérios de aceite, com peso e obrigatoriedade.</p>
+            </li>
+            <li>
+                <h3>Carlos e João</h3>
+                <p>Listam as vagas abertas e se candidatam enviando o currículo em PDF.</p>
+            </li>
+            <li>
+                <h3>A triagem</h3>
+                <p>Compara o currículo com os critérios, aprova ou reprova, e avisa por e-mail
+                    explicando o motivo.</p>
+            </li>
+        </ol>
+    </section>
+</main>
+</body>
+</html>

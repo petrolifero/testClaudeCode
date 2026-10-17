@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/cabecalho :: cabeca('Vagas')}"></head>
+<body>
+<header th:replace="~{fragmentos/cabecalho :: topo}"></header>
+
+<main>
+    <div th:replace="~{fragmentos/cabecalho :: recados}"></div>
+
+    <h1>Vagas abertas</h1>
+
+    <p class="vazio" th:if="${vagas.isEmpty()}">
+        Nenhuma vaga aberta no momento.
+    </p>
+
+    <ul class="lista-vagas">
+        <li th:each="vaga : ${vagas}" class="cartao">
+            <h2><a th:href="@{/vagas/{id}(id=${vaga.id})}" th:text="${vaga.titulo}">Título</a></h2>
+            <p class="meta">
+                <span th:text="${vaga.recrutador.nome}">Recrutador</span>
+                ·
+                <span th:text="${#lists.size(vaga.criterios)} + ' critério(s) de aceite'">critérios</span>
+                ·
+                <span th:text="'nota mínima ' + ${vaga.pontuacaoMinima}">nota</span>
+            </p>
+            <p class="descricao" th:text="${vaga.descricao}">Descrição</p>
+        </li>
+    </ul>
+</main>
+</body>
+</html>

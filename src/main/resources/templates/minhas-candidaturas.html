@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/cabecalho :: cabeca('Minhas candidaturas')}"></head>
+<body>
+<header th:replace="~{fragmentos/cabecalho :: topo}"></header>
+
+<main>
+    <div th:replace="~{fragmentos/cabecalho :: recados}"></div>
+
+    <h1>Minhas candidaturas</h1>
+
+    <p class="vazio" th:if="${candidaturas.isEmpty()}">
+        Você ainda não se candidatou a nenhuma vaga.
+        <a th:href="@{/vagas}">Ver as vagas abertas</a>.
+    </p>
+
+    <table class="candidaturas" th:unless="${candidaturas.isEmpty()}">
+        <thead>
+        <tr><th>Vaga</th><th>Situação</th><th>Pontuação</th><th>Motivo</th><th>Currículo</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="candidatura : ${candidaturas}">
+            <td><a th:href="@{/vagas/{id}(id=${candidatura.vagaId})}"
+                   th:text="${candidatura.tituloDaVaga}">Vaga</a></td>
+            <td>
+                <span class="selo" th:classappend="${'selo-' + candidatura.status}"
+                      th:text="${candidatura.status}">Status</span>
+            </td>
+            <td th:text="${candidatura.pontuacao != null} ? ${candidatura.pontuacao} : '—'">—</td>
+            <td class="motivo" th:text="${candidatura.motivo != null} ? ${candidatura.motivo} : 'Em análise.'">—</td>
+            <td th:text="${candidatura.origemDoTexto.name() == 'OCR'} ? 'digitalizado (OCR)' : 'texto'">texto</td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

@@ -1,4 +1,16 @@
 spring:
+  datasource:
+    hikari:
+      # Os testes de concorrencia usam 10 threads simultaneas; com o pool
+      # padrao (10) qualquer outro consumidor esgota o pool e o teste falha com
+      # timeout de conexao em vez de dizer algo sobre o codigo.
+      maximum-pool-size: 20
+      # Mais importante que o maximo: por padrao o Hikari mantem
+      # minimumIdle = maximumPoolSize, ou seja cada contexto Spring em cache
+      # (os testes usam varios, com @TestPropertySource diferentes) ficaria
+      # segurando 20 conexoes ociosas do mesmo PostgreSQL.
+      minimum-idle: 1
+      idle-timeout: 10000
   jpa:
     hibernate:
       ddl-auto: validate
