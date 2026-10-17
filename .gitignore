@@ -31,3 +31,10 @@ build/
 
 ### OS ###
 .DS_Store
+
+# Logs
+*.log
+
+# Credenciais locais
+.env
+.env.local

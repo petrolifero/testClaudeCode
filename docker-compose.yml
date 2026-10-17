@@ -1,0 +1,53 @@
+# Sobe o que a aplicacao precisa para rodar fora dos testes.
+#
+# Para ler os e-mails que a triagem envia, abra o Mailpit em
+# http://localhost:8025 — ele e um servidor SMTP de desenvolvimento, nada sai
+# para a internet.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gupy
+      POSTGRES_USER: gupy
+      POSTGRES_PASSWORD: gupy
+    ports:
+      - "5432:5432"
+    volumes:
+      - dados-do-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gupy -d gupy"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"   # SMTP, que e o default de spring.mail.port
+      - "8025:8025"   # interface web para ler as mensagens
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      GUPY_DB_URL: jdbc:postgresql://postgres:5432/gupy
+      GUPY_DB_USER: gupy
+      GUPY_DB_PASSWORD: gupy
+      GUPY_SMTP_HOST: mailpit
+      GUPY_SMTP_PORT: "1025"
+      # Em producao venha de um gerenciador de segredos; HS256 exige 32+ bytes.
+      GUPY_JWT_SEGREDO: troque-este-segredo-em-producao-com-32-bytes
+      GUPY_TRIAGEM_ESTRATEGIA: full-text-search
+    ports:
+      - "8080:8080"
+
+volumes:
+  dados-do-postgres:
