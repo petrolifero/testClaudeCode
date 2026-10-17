@@ -1,0 +1,60 @@
+spring:
+  application:
+    name: gupy-clone
+  datasource:
+    url: ${GUPY_DB_URL:jdbc:postgresql://localhost:5432/gupy}
+    username: ${GUPY_DB_USER:gupy}
+    password: ${GUPY_DB_PASSWORD:gupy}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 20MB
+  mail:
+    host: ${GUPY_SMTP_HOST:localhost}
+    port: ${GUPY_SMTP_PORT:1025}
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+  thymeleaf:
+    cache: false
+
+gupy:
+  jwt:
+    # Em producao venha de variavel de ambiente. HS256 exige >= 32 bytes.
+    segredo: ${GUPY_JWT_SEGREDO:segredo-de-desenvolvimento-com-32-bytes-ou-mais}
+    validade: PT8H
+    cookie: gupy_sessao
+    # Em producao sirva por HTTPS e deixe true.
+    cookie-seguro: ${GUPY_COOKIE_SEGURO:false}
+  triagem:
+    estrategia: ${GUPY_TRIAGEM_ESTRATEGIA:full-text-search}
+    intervalo: PT0.5S
+    lote: 10
+    max-tentativas: 3
+    espera-apos-falha: PT5S
+  ocr:
+    idiomas: ${GUPY_OCR_IDIOMAS:por+eng}
+    datapath: ${GUPY_OCR_DATAPATH:/usr/share/tesseract-ocr/5/tessdata}
+    dpi: 300
+    minimo-de-caracteres-na-camada-de-texto: 40
+  email:
+    remetente: naoresponda@gupyclone.com.br
+    intervalo: PT0.5S
+    lote: 10
+    max-tentativas: 3
+    espera-apos-falha: PT5S
+  llm:
+    base-url: ${GUPY_LLM_BASE_URL:https://api.anthropic.com}
+    api-key: ${GUPY_LLM_API_KEY:}
+    modelo: ${GUPY_LLM_MODELO:claude-opus-5}
+    timeout: PT30S
+
+logging:
+  level:
+    com.gupyclone: INFO

@@ -1,0 +1,119 @@
+package com.gupyclone.suporte;
+
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+
+/**
+ * Gera curriculos em PDF de verdade para os testes.
+ *
+ * <p>Sao fixtures, nao mocks: os bytes produzidos aqui sao PDFs validos, lidos
+ * pelo mesmo PDFBox que a aplicacao usa. Existem duas variantes porque o
+ * enunciado pede as duas:
+ * <ul>
+ *   <li>{@link #comCamadaDeTexto} — PDF "bonzinho", com texto selecionavel;</li>
+ *   <li>{@link #somenteImagem} — PDF em que cada pagina e uma imagem, sem
+ *       nenhum texto embutido, que so pode ser lido por OCR.</li>
+ * </ul>
+ */
+public final class FabricaDePdf {
+
+    /** A4 a 200 DPI: resolucao confortavel para o Tesseract. */
+    private static final int LARGURA_EM_PIXELS = 1654;
+    private static final int ALTURA_EM_PIXELS = 2339;
+
+    private FabricaDePdf() {
+    }
+
+    /** PDF com camada de texto selecionavel. */
+    public static byte[] comCamadaDeTexto(String... linhas) {
+        try (PDDocument documento = new PDDocument()) {
+            PDPage pagina = new PDPage(PDRectangle.A4);
+            documento.addPage(pagina);
+            try (PDPageContentStream conteudo = new PDPageContentStream(documento, pagina)) {
+                conteudo.beginText();
+                conteudo.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                conteudo.setLeading(16);
+                conteudo.newLineAtOffset(50, 780);
+                for (String linha : linhas) {
+                    conteudo.showText(linha);
+                    conteudo.newLine();
+                }
+                conteudo.endText();
+            }
+            return emBytes(documento);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * PDF cuja unica pagina e uma imagem com o texto desenhado: nao tem camada
+     * de texto, portanto exige OCR.
+     */
+    public static byte[] somenteImagem(String... linhas) {
+        try (PDDocument documento = new PDDocument()) {
+            PDPage pagina = new PDPage(PDRectangle.A4);
+            documento.addPage(pagina);
+            PDImageXObject imagem = LosslessFactory.createFromImage(documento, desenhar(linhas));
+            try (PDPageContentStream conteudo = new PDPageContentStream(documento, pagina)) {
+                PDRectangle caixa = pagina.getMediaBox();
+                conteudo.drawImage(imagem, 0, 0, caixa.getWidth(), caixa.getHeight());
+            }
+            return emBytes(documento);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** PDF valido, porem sem texto algum: nem camada de texto, nem imagem legivel. */
+    public static byte[] paginaEmBranco() {
+        try (PDDocument documento = new PDDocument()) {
+            documento.addPage(new PDPage(PDRectangle.A4));
+            return emBytes(documento);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static BufferedImage desenhar(String... linhas) {
+        BufferedImage imagem = new BufferedImage(LARGURA_EM_PIXELS, ALTURA_EM_PIXELS, BufferedImage.TYPE_INT_RGB);
+        Graphics2D grafico = imagem.createGraphics();
+        try {
+            grafico.setColor(Color.WHITE);
+            grafico.fillRect(0, 0, LARGURA_EM_PIXELS, ALTURA_EM_PIXELS);
+            grafico.setColor(Color.BLACK);
+            grafico.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                    RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            grafico.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            grafico.setFont(new Font("DejaVu Sans", Font.PLAIN, 44));
+            int y = 160;
+            for (String linha : linhas) {
+                grafico.drawString(linha, 120, y);
+                y += 78;
+            }
+        } finally {
+            grafico.dispose();
+        }
+        return imagem;
+    }
+
+    private static byte[] emBytes(PDDocument documento) throws IOException {
+        ByteArrayOutputStream saida = new ByteArrayOutputStream();
+        documento.save(saida);
+        return saida.toByteArray();
+    }
+}

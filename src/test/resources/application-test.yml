@@ -1,0 +1,32 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  mail:
+    host: localhost
+    port: 3025
+  thymeleaf:
+    cache: false
+
+gupy:
+  jwt:
+    segredo: segredo-exclusivo-de-teste-com-mais-de-32-bytes
+    validade: PT1H
+    cookie: gupy_sessao
+  triagem:
+    # Nos testes o processamento e disparado explicitamente, nao pelo agendador.
+    intervalo: PT1H
+    lote: 10
+    max-tentativas: 3
+    espera-apos-falha: PT0S
+  email:
+    intervalo: PT1H
+    lote: 10
+    max-tentativas: 3
+    espera-apos-falha: PT0S
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN
+    org.hibernate.SQL: WARN
