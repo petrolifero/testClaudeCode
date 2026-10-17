@@ -1,6 +1,7 @@
 package com.gupyclone.curriculos;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gupyclone.config.PropriedadesOcr;
@@ -29,10 +30,13 @@ class MotorDeOcrTesseractTest {
     private static final String DATAPATH =
             System.getenv().getOrDefault("GUPY_OCR_DATAPATH", "/usr/share/tesseract-ocr/5/tessdata");
 
+    private static final String EXECUTAVEL =
+            System.getenv().getOrDefault("GUPY_OCR_EXECUTAVEL", "tesseract");
+
     @Test
     @DisplayName("reconhece o texto de uma pagina rasterizada")
     void reconheceTextoDaPagina() throws IOException {
-        MotorDeOcr motor = new MotorDeOcrTesseract(new PropriedadesOcr("por+eng", DATAPATH, 300, 40));
+        MotorDeOcr motor = new MotorDeOcrTesseract(new PropriedadesOcr("por+eng", DATAPATH, 300, 40, EXECUTAVEL));
 
         String reconhecido = motor.reconhecer(rasterizar(FabricaDePdf.somenteImagem(
                 "Carlos Pereira", "Desenvolvedor Java com Spring Boot")));
@@ -46,7 +50,7 @@ class MotorDeOcrTesseractTest {
         Path semIdiomas = Files.createTempDirectory("tessdata-vazio");
         try {
             MotorDeOcr motor = new MotorDeOcrTesseract(
-                    new PropriedadesOcr("por+eng", semIdiomas.toString(), 300, 40));
+                    new PropriedadesOcr("por+eng", semIdiomas.toString(), 300, 40, EXECUTAVEL));
             BufferedImage pagina = rasterizar(FabricaDePdf.somenteImagem("Carlos Pereira"));
 
             assertThatThrownBy(() -> motor.reconhecer(pagina))
@@ -60,13 +64,27 @@ class MotorDeOcrTesseractTest {
     @Test
     @DisplayName("nao vaza arquivo temporario de OCR")
     void naoDeixaTemporarioParaTras() throws IOException {
-        MotorDeOcr motor = new MotorDeOcrTesseract(new PropriedadesOcr("por+eng", DATAPATH, 300, 40));
+        MotorDeOcr motor = new MotorDeOcrTesseract(new PropriedadesOcr("por+eng", DATAPATH, 300, 40, EXECUTAVEL));
         BufferedImage pagina = rasterizar(FabricaDePdf.somenteImagem("Carlos Pereira"));
         long antes = temporariosDeOcr();
 
         motor.reconhecer(pagina);
 
         assertThat(temporariosDeOcr()).isEqualTo(antes);
+    }
+
+    @Test
+    @DisplayName("binario de OCR inexistente da erro com a receita de instalacao")
+    void binarioAusente() throws IOException {
+        // So da para provar este caminho porque gupy.ocr.executavel e
+        // configuravel: aqui aponta para um binario que nao existe.
+        MotorDeOcr motor = new MotorDeOcrTesseract(
+                new PropriedadesOcr("por+eng", DATAPATH, 300, 40, "tesseract-que-nao-existe"));
+        BufferedImage pagina = rasterizar(FabricaDePdf.somenteImagem("Carlos Pereira"));
+
+        assertThatExceptionOfType(OcrIndisponivelException.class)
+                .isThrownBy(() -> motor.reconhecer(pagina))
+                .withMessageContaining("apt-get install");
     }
 
     private static long temporariosDeOcr() throws IOException {

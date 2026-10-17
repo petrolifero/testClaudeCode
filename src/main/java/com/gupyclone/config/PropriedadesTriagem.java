@@ -11,6 +11,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param lote             quantos jobs um worker reivindica por varredura
  * @param maxTentativas    apos isso o job vira FALHO e para de ser reprocessado
  * @param esperaAposFalha  atraso aplicado antes de uma nova tentativa
+ * @param lease            depois disso um job reivindicado e considerado
+ *                         abandonado e volta para PENDENTE
  */
 @ConfigurationProperties(prefix = "gupy.triagem")
 public record PropriedadesTriagem(
@@ -18,5 +20,6 @@ public record PropriedadesTriagem(
         Duration intervalo,
         int lote,
         int maxTentativas,
-        Duration esperaAposFalha) {
+        Duration esperaAposFalha,
+        Duration lease) {
 }

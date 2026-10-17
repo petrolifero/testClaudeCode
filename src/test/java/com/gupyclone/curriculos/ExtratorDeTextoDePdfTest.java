@@ -25,7 +25,8 @@ class ExtratorDeTextoDePdfTest {
             System.getenv().getOrDefault("GUPY_OCR_IDIOMAS", "por+eng"),
             System.getenv().getOrDefault("GUPY_OCR_DATAPATH", "/usr/share/tesseract-ocr/5/tessdata"),
             300,
-            40);
+            40,
+            System.getenv().getOrDefault("GUPY_OCR_EXECUTAVEL", "tesseract"));
 
     private final ExtratorDeTextoDePdf extrator =
             new ExtratorDeTextoComOcrDeFallback(new MotorDeOcrTesseract(PROPRIEDADES), PROPRIEDADES);

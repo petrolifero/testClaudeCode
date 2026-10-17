@@ -3,7 +3,6 @@ package com.gupyclone.notificacoes;
 import com.gupyclone.config.PropriedadesEmail;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import java.time.Duration;
 import java.util.List;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -37,11 +36,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class DespachanteDeEmails {
 
-    /**
-     * Depois disso um aviso reivindicado e considerado abandonado. Folgado em
-     * relacao ao tempo de um envio: devolver cedo demais e reenviar de graca.
-     */
-    private static final Duration LEASE = Duration.ofMinutes(5);
 
     private static final String CHARSET = "UTF-8";
 
@@ -94,7 +88,7 @@ public class DespachanteDeEmails {
      * @return quantos voltaram para PENDENTE
      */
     public int recuperarLeasesExpirados() {
-        return reivindicador.devolverLeasesExpirados(LEASE);
+        return reivindicador.devolverLeasesExpirados(propriedades.lease());
     }
 
     private boolean despachar(Long id) {

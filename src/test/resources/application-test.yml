@@ -21,11 +21,13 @@ gupy:
     lote: 10
     max-tentativas: 3
     espera-apos-falha: PT0S
+    lease: PT5M
   email:
     intervalo: PT1H
     lote: 10
     max-tentativas: 3
     espera-apos-falha: PT0S
+    lease: PT5M
 
 logging:
   level:

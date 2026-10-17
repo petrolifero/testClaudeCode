@@ -120,7 +120,7 @@ public class MotorDeOcrTesseract implements MotorDeOcr {
     }
 
     private List<String> comando(Path entrada) {
-        List<String> comando = new ArrayList<>(List.of("tesseract", entrada.toString(), "stdout"));
+        List<String> comando = new ArrayList<>(List.of(propriedades.executavel(), entrada.toString(), "stdout"));
         if (preenchido(propriedades.idiomas())) {
             comando.add("-l");
             comando.add(propriedades.idiomas().strip());

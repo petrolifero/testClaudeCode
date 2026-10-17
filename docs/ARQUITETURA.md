@@ -110,8 +110,14 @@ com.gupyclone
 
 - **Português** em pacotes, classes, métodos, colunas e mensagens. Siglas
   consagradas (`id`, `jwt`, `ocr`, `pdf`, `api`, `rh`) ficam como são.
-- Sem acentos em identificadores Java e em literais SQL de migração; texto
-  voltado ao usuário (HTML, e-mail, documentação) usa acentuação normal.
+- Sem acentos em identificadores Java e em literais SQL de migração.
+- Acentuação em mensagens é decidida por quem lê:
+  - **com acento** tudo que chega a uma pessoa: HTML, corpo e assunto de
+    e-mail, mensagens de `ErroDeNegocio` e de Bean Validation (viram corpo de
+    resposta da API);
+  - **sem acento** mensagens que só aparecem em log ou em exceção de violação
+    de contrato de programação (`IllegalArgumentException`,
+    `IllegalStateException`), que nunca chegam ao candidato.
 - Toda exceção de domínio estende `comum.ErroDeNegocio` e declara seu status
   HTTP; quem traduz para JSON é `comum.TratadorDeErrosDaApi`.
 - Entidades estendem `comum.EntidadeComId` (id, `equals`/`hashCode`).

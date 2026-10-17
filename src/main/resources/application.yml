@@ -21,6 +21,11 @@ spring:
     properties:
       mail.smtp.auth: false
       mail.smtp.starttls.enable: false
+      # Sem timeout, um SMTP que aceita a conexao e nao responde prende o
+      # worker de e-mails ate o timeout do sistema operacional.
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
   thymeleaf:
     cache: false
 
@@ -42,17 +47,20 @@ gupy:
     lote: 10
     max-tentativas: 3
     espera-apos-falha: PT5S
+    lease: PT5M
   ocr:
     idiomas: ${GUPY_OCR_IDIOMAS:por+eng}
     datapath: ${GUPY_OCR_DATAPATH:/usr/share/tesseract-ocr/5/tessdata}
     dpi: 300
     minimo-de-caracteres-na-camada-de-texto: 40
+    executavel: ${GUPY_OCR_EXECUTAVEL:tesseract}
   email:
     remetente: naoresponda@gupyclone.com.br
     intervalo: PT0.5S
     lote: 10
     max-tentativas: 3
     espera-apos-falha: PT5S
+    lease: PT5M
   llm:
     base-url: ${GUPY_LLM_BASE_URL:https://api.anthropic.com}
     api-key: ${GUPY_LLM_API_KEY:}
