@@ -9,6 +9,8 @@ spring:
     cache: false
 
 gupy:
+  agendamento:
+    ativo: false
   jwt:
     segredo: segredo-exclusivo-de-teste-com-mais-de-32-bytes
     validade: PT1H

@@ -25,6 +25,10 @@ spring:
     cache: false
 
 gupy:
+  # Liga os @Scheduled das filas. Os testes desligam para controlar o
+  # processamento explicitamente, sem corrida com o agendador.
+  agendamento:
+    ativo: ${GUPY_AGENDAMENTO_ATIVO:true}
   jwt:
     # Em producao venha de variavel de ambiente. HS256 exige >= 32 bytes.
     segredo: ${GUPY_JWT_SEGREDO:segredo-de-desenvolvimento-com-32-bytes-ou-mais}
