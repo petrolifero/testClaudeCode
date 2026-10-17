@@ -17,12 +17,13 @@ class CabecalhoTest extends TesteDeInterface {
     void deslogadoMostraAsTresPessoas() {
         var pagina = navegador().abrir("/").html();
 
-        var entrar = pagina.select("form[action*=/auth/entrar/]");
-        assertThat(entrar).hasSize(3);
-        assertThat(entrar.stream().map(form -> form.attr("action")).toList())
-                .anyMatch(acao -> acao.endsWith("/ana"))
-                .anyMatch(acao -> acao.endsWith("/carlos"))
-                .anyMatch(acao -> acao.endsWith("/joao"));
+        var chavesOferecidas = pagina.select("form[action*=/auth/entrar/]").stream()
+                .map(form -> form.attr("action").replaceAll(".*/", ""))
+                .toList();
+
+        assertThat(chavesOferecidas)
+                .as("exatamente as tres pessoas do enunciado, nem mais nem menos")
+                .containsExactlyInAnyOrder("ana", "carlos", "joao");
         assertThat(pagina.select("form[action*=/auth/sair]")).isEmpty();
     }
 
