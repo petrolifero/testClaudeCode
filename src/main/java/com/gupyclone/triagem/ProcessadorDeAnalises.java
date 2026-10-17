@@ -115,7 +115,7 @@ public class ProcessadorDeAnalises {
      * @return quantos voltaram para PENDENTE
      */
     public int recuperarLeasesExpirados() {
-        return reivindicador.devolverLeasesExpirados(propriedades.lease());
+        return reivindicador.devolverLeasesExpirados(propriedades.lease(), propriedades.maxTentativas());
     }
 
     private boolean processar(Long jobId) {

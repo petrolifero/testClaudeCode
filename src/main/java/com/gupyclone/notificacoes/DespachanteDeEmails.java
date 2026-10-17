@@ -88,7 +88,7 @@ public class DespachanteDeEmails {
      * @return quantos voltaram para PENDENTE
      */
     public int recuperarLeasesExpirados() {
-        return reivindicador.devolverLeasesExpirados(propriedades.lease());
+        return reivindicador.devolverLeasesExpirados(propriedades.lease(), propriedades.maxTentativas());
     }
 
     private boolean despachar(Long id) {

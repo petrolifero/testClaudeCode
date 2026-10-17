@@ -30,9 +30,15 @@ public class ReivindicadorDeEmails {
             returning id
             """;
 
+    // Mesmo cuidado da fila de analise: esgotadas as tentativas o aviso vira
+    // FALHO em vez de ser reivindicado para sempre por um worker que morre
+    // sempre no mesmo ponto.
     private static final String SQL_DEVOLVER_LEASE_EXPIRADO = """
             update email_outbox
-               set status = 'PENDENTE',
+               set status = case when tentativas >= ? then 'FALHO' else 'PENDENTE' end,
+                   ultimo_erro = case when tentativas >= ? then
+                                     coalesce(ultimo_erro, 'lease expirado sem conclusao')
+                                 else ultimo_erro end,
                    reivindicado_em = null
              where status = 'ENVIANDO'
                and reivindicado_em < now() - make_interval(secs => ?)
@@ -52,8 +58,17 @@ public class ReivindicadorDeEmails {
         return jdbc.sql(SQL_REIVINDICAR).param(lote).query(Long.class).list();
     }
 
+    /**
+     * @param maxTentativas esgotadas as tentativas, o aviso vira FALHO em vez
+     *                      de voltar para a fila
+     * @return quantos avisos sairam de ENVIANDO
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int devolverLeasesExpirados(Duration lease) {
-        return jdbc.sql(SQL_DEVOLVER_LEASE_EXPIRADO).param(lease.toMillis() / 1000.0).update();
+    public int devolverLeasesExpirados(Duration lease, int maxTentativas) {
+        return jdbc.sql(SQL_DEVOLVER_LEASE_EXPIRADO)
+                .param(maxTentativas)
+                .param(maxTentativas)
+                .param(lease.toMillis() / 1000.0)
+                .update();
     }
 }

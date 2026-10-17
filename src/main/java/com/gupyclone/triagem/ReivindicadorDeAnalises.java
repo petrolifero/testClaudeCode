@@ -37,9 +37,17 @@ public class ReivindicadorDeAnalises {
             returning id
             """;
 
+    // Um job cujo worker morre sempre no mesmo ponto nao pode voltar para a fila
+    // indefinidamente: a cada reivindicacao "tentativas" cresce, e esgotadas as
+    // tentativas ele vira FALHO aqui, do mesmo jeito que viraria por
+    // registrarFalha. Sem isso, um job envenenado seria reivindicado para
+    // sempre e nunca apareceria como problema.
     private static final String SQL_DEVOLVER_LEASE_EXPIRADO = """
             update analise_job
-               set status = 'PENDENTE',
+               set status = case when tentativas >= ? then 'FALHO' else 'PENDENTE' end,
+                   ultimo_erro = case when tentativas >= ? then
+                                     coalesce(ultimo_erro, 'lease expirado sem conclusao')
+                                 else ultimo_erro end,
                    reivindicado_em = null,
                    atualizado_em = now()
              where status = 'PROCESSANDO'
@@ -68,10 +76,16 @@ public class ReivindicadorDeAnalises {
      * Devolve a fila os jobs cujo worker morreu antes de concluir. E isso que
      * garante que nenhuma candidatura fique presa em PROCESSANDO para sempre.
      *
-     * @return quantos jobs voltaram para PENDENTE
+     * @param maxTentativas esgotadas as tentativas, o job vira FALHO em vez de
+     *                      voltar para a fila
+     * @return quantos jobs sairam de PROCESSANDO
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public int devolverLeasesExpirados(Duration lease) {
-        return jdbc.sql(SQL_DEVOLVER_LEASE_EXPIRADO).param(lease.toMillis() / 1000.0).update();
+    public int devolverLeasesExpirados(Duration lease, int maxTentativas) {
+        return jdbc.sql(SQL_DEVOLVER_LEASE_EXPIRADO)
+                .param(maxTentativas)
+                .param(maxTentativas)
+                .param(lease.toMillis() / 1000.0)
+                .update();
     }
 }
