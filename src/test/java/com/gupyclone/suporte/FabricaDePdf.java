@@ -89,6 +89,57 @@ public final class FabricaDePdf {
         }
     }
 
+    /**
+     * PDF com varias paginas, cada uma uma imagem: so esta lido por completo
+     * quem rasterizar e passar por OCR <em>todas</em> as paginas.
+     *
+     * @param paginas as linhas de cada pagina, na ordem
+     */
+    public static byte[] somenteImagemComVariasPaginas(String[]... paginas) {
+        try (PDDocument documento = new PDDocument()) {
+            for (String[] linhas : paginas) {
+                PDPage pagina = new PDPage(PDRectangle.A4);
+                documento.addPage(pagina);
+                PDImageXObject imagem = LosslessFactory.createFromImage(documento, desenhar(linhas));
+                try (PDPageContentStream conteudo = new PDPageContentStream(documento, pagina)) {
+                    PDRectangle caixa = pagina.getMediaBox();
+                    conteudo.drawImage(imagem, 0, 0, caixa.getWidth(), caixa.getHeight());
+                }
+            }
+            return emBytes(documento);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * PDF de imagem com uma camada de texto minuscula por cima — um numero de
+     * pagina, uma marca d'agua do digitalizador. E o caso traicoeiro: existe
+     * camada de texto, mas ela nao e o curriculo, e so o OCR le o conteudo.
+     *
+     * @param textoCurto o pouco texto selecionavel da pagina
+     * @param linhas     o conteudo de verdade, desenhado na imagem
+     */
+    public static byte[] imagemComCamadaDeTextoCurta(String textoCurto, String... linhas) {
+        try (PDDocument documento = new PDDocument()) {
+            PDPage pagina = new PDPage(PDRectangle.A4);
+            documento.addPage(pagina);
+            PDImageXObject imagem = LosslessFactory.createFromImage(documento, desenhar(linhas));
+            try (PDPageContentStream conteudo = new PDPageContentStream(documento, pagina)) {
+                PDRectangle caixa = pagina.getMediaBox();
+                conteudo.drawImage(imagem, 0, 0, caixa.getWidth(), caixa.getHeight());
+                conteudo.beginText();
+                conteudo.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 8);
+                conteudo.newLineAtOffset(40, 24);
+                conteudo.showText(textoCurto);
+                conteudo.endText();
+            }
+            return emBytes(documento);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static BufferedImage desenhar(String... linhas) {
         BufferedImage imagem = new BufferedImage(LARGURA_EM_PIXELS, ALTURA_EM_PIXELS, BufferedImage.TYPE_INT_RGB);
         Graphics2D grafico = imagem.createGraphics();
