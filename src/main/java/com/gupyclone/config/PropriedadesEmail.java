@@ -9,6 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param lease depois disso um aviso reivindicado e considerado abandonado e
  *              volta para a fila. Folgado em relacao a um envio: devolver cedo
  *              demais custa um reenvio, devolver tarde custa um atraso.
+ * @param quarentena depois disso um aviso FALHO volta para a fila, para que uma
+ *                   queda do servidor SMTP nao engula o aviso em definitivo
  */
 @ConfigurationProperties(prefix = "gupy.email")
 public record PropriedadesEmail(
@@ -17,5 +19,12 @@ public record PropriedadesEmail(
         int lote,
         int maxTentativas,
         Duration esperaAposFalha,
-        Duration lease) {
+        Duration lease,
+        Duration quarentena) {
+
+    public PropriedadesEmail {
+        if (quarentena == null || quarentena.isZero() || quarentena.isNegative()) {
+            quarentena = Duration.ofHours(1);
+        }
+    }
 }

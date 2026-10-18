@@ -50,11 +50,25 @@ class ConfiguracaoDaTriagemTest extends TesteDeIntegracao {
     }
 
     @Test
-    @DisplayName("com estrategia 'llm' o escolhido e o analisador por LLM")
+    @DisplayName("com estrategia 'llm' o escolhido e o analisador por LLM, envolvido no veto de obrigatorios")
     void escolheODeLlm() {
         contextoCom(AnalisadorViaLlm.NOME).run(contexto -> {
             assertThat(contexto).hasNotFailed();
-            assertThat(contexto.getBean(AnalisadorDeCandidatura.class)).isSameAs(viaLlm);
+            AnalisadorDeCandidatura publicado = contexto.getBean(AnalisadorDeCandidatura.class);
+            assertThat(publicado.nome()).isEqualTo(AnalisadorViaLlm.NOME);
+            assertThat(publicado)
+                    .as("estrategia que decide por meio influenciavel pelo candidato passa pelo veto")
+                    .isInstanceOf(AnalisadorComVetoDeObrigatorios.class);
+        });
+    }
+
+    @Test
+    @DisplayName("o analisador textual NAO e envolvido pelo veto: ele ja decide pela mesma consulta")
+    void textualNaoEEnvolvido() {
+        contextoCom(AnalisadorFullTextSearch.NOME).run(contexto -> {
+            assertThat(contexto).hasNotFailed();
+            assertThat(contexto.getBean(AnalisadorDeCandidatura.class))
+                    .isNotInstanceOf(AnalisadorComVetoDeObrigatorios.class);
         });
     }
 
@@ -86,6 +100,7 @@ class ConfiguracaoDaTriagemTest extends TesteDeIntegracao {
                 propriedades.lote(),
                 propriedades.maxTentativas(),
                 propriedades.esperaAposFalha(),
-                propriedades.lease());
+                propriedades.lease(),
+                propriedades.quarentena());
     }
 }

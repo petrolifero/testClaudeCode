@@ -15,10 +15,15 @@ import org.springframework.test.context.TestPropertySource;
  * {@code gupy.llm.base-url} aponta para uma porta onde ninguem escuta.
  *
  * <p>O que se prova e a prioridade do projeto quando a analise quebra: nada
- * aprovado por engano, nada perdido em silencio. O job volta para a fila com a
- * tentativa contada e o erro gravado; esgotadas as tentativas ele vira FALHO e
- * fica na tabela para auditoria; a candidatura continua RECEBIDA o tempo todo e
- * nenhum e-mail e enfileirado.
+ * aprovado por engano e nada perdido. O job volta para a fila com a tentativa
+ * contada e o erro gravado; esgotadas as tentativas ele vira FALHO; e passada a
+ * quarentena ele VOLTA para a fila. A candidatura continua RECEBIDA enquanto a
+ * analise nao decide, e nenhum e-mail e enfileirado nesse meio-tempo.
+ *
+ * <p>A quarentena existe por causa desta revisao: antes, FALHO era terminal e
+ * nenhum codigo o devolvia a fila, de modo que uma indisponibilidade de
+ * segundos deixava a candidatura sem decisao para sempre. Este teste chamava
+ * esse desfecho de correto; agora ele prova a recuperacao.
  */
 @TestPropertySource(properties = {
         "gupy.triagem.estrategia=llm",
@@ -37,8 +42,10 @@ class TriagemComLlmForaDoArTest extends TesteDeTriagem {
     @Test
     @DisplayName("com gupy.triagem.estrategia=llm quem analisa e o analisador por LLM")
     void estrategiaLlmFoiEscolhida() {
-        assertThat(escolhido).isInstanceOf(AnalisadorViaLlm.class);
+        // O bean publicado e o decorador de veto; o nome delegado e o que diz
+        // qual estrategia esta de pe.
         assertThat(escolhido.nome()).isEqualTo(AnalisadorViaLlm.NOME);
+        assertThat(escolhido).isInstanceOf(AnalisadorComVetoDeObrigatorios.class);
     }
 
     @Test
@@ -74,9 +81,45 @@ class TriagemComLlmForaDoArTest extends TesteDeTriagem {
         assertThat(esgotado.getTentativas()).isEqualTo(3);
         assertThat(esgotado.getUltimoErro()).isNotBlank();
 
-        assertThat(processador.processarUmLote()).as("FALHO nao e reivindicado").isZero();
-        assertThat(processador.recuperarLeasesExpirados()).as("FALHO nao e devolvido pelo lease").isZero();
+        // Enquanto a quarentena nao vence, o job FALHO descansa: nao e
+        // reivindicado nem devolvido pelo lease. O custo disso esta explicito
+        // aqui: a candidatura segue sem decisao e ninguem foi avisado.
+        assertThat(processador.processarUmLote()).as("FALHO nao e reivindicado de imediato").isZero();
+        assertThat(processador.recuperarLeasesExpirados()).as("FALHO nao e assunto do lease").isZero();
         assertThat(candidaturas.findAllByStatus(StatusCandidatura.RECEBIDA)).hasSize(1);
         assertThat(emails.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("passada a quarentena o job FALHO volta para a fila: FALHO nao e terminal")
+    void quarentenaDevolveOJobQueFalhou() {
+        Vaga vaga = publicarVagaDeExemplo(60);
+        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        Long jobId = analises.findByCandidaturaId(candidatura.getId()).orElseThrow().getId();
+
+        // Esgota as tentativas contra a LLM fora do ar.
+        for (int tentativa = 0; tentativa < 3; tentativa++) {
+            processador.processarUmLote();
+        }
+        assertThat(analises.findById(jobId).orElseThrow().getStatus()).isEqualTo(StatusJob.FALHO);
+
+        // Envelhece o job para a quarentena vencer (PT1H no perfil de teste).
+        jdbc.sql("update analise_job set atualizado_em = now() - interval '2 hours' where id = ?")
+                .param(jobId).update();
+
+        assertThat(processador.reenfileirarOsQueFalharam())
+                .as("o job volta para a fila em vez de ficar esquecido")
+                .isEqualTo(1);
+
+        AnaliseJob devolvido = analises.findById(jobId).orElseThrow();
+        assertThat(devolvido.getStatus()).isEqualTo(StatusJob.PENDENTE);
+        assertThat(devolvido.getTentativas())
+                .as("o orcamento de tentativas recomeca: a falha anterior pode ter sido transitoria")
+                .isZero();
+
+        // E o processamento volta a acontecer de verdade (aqui falha de novo,
+        // porque a LLM continua fora do ar -- mas foi TENTADO).
+        assertThat(processador.processarUmLote()).isZero();
+        assertThat(analises.findById(jobId).orElseThrow().getTentativas()).isEqualTo(1);
     }
 }

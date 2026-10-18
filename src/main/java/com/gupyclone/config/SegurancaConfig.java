@@ -1,7 +1,7 @@
 package com.gupyclone.config;
 
 import com.gupyclone.seguranca.FiltroDeAutenticacaoJwt;
-import jakarta.servlet.http.HttpServletRequest;
+import com.gupyclone.seguranca.RequisicoesDaApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -29,15 +29,12 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @EnableMethodSecurity
 public class SegurancaConfig {
 
-    /** Casa com /api/** sem depender de classes de matcher que mudam entre versoes. */
-    private static final RequestMatcher API = (HttpServletRequest requisicao) -> {
-        String caminho = requisicao.getRequestURI();
-        String contexto = requisicao.getContextPath();
-        if (contexto != null && !contexto.isEmpty() && caminho.startsWith(contexto)) {
-            caminho = caminho.substring(contexto.length());
-        }
-        return caminho.startsWith("/api/");
-    };
+    /**
+     * O MESMO matcher que o filtro de autenticacao usa. Dois matchers com
+     * leituras diferentes do que e "/api/**" era justamente o que permitia
+     * burlar a invariante por percent-encoding.
+     */
+    private static final RequestMatcher API = RequisicoesDaApi.MATCHER;
 
     /** Catch-all: usado como ultimo mapeamento de entry point. */
     private static final RequestMatcher QUALQUER_REQUISICAO = requisicao -> true;

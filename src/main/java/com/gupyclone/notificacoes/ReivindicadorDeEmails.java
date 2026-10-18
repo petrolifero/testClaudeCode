@@ -44,6 +44,16 @@ public class ReivindicadorDeEmails {
                and reivindicado_em < now() - make_interval(secs => ?)
             """;
 
+    /** Mesma quarentena da fila de analise: FALHO e descanso, nao tumulo. */
+    private static final String SQL_TIRAR_DA_QUARENTENA = """
+            update email_outbox
+               set status = 'PENDENTE',
+                   tentativas = 0,
+                   disponivel_em = now()
+             where status = 'FALHO'
+               and coalesce(reivindicado_em, criado_em) < now() - make_interval(secs => ?)
+            """;
+
     private final JdbcClient jdbc;
 
     public ReivindicadorDeEmails(JdbcClient jdbc) {
@@ -63,6 +73,11 @@ public class ReivindicadorDeEmails {
      *                      de voltar para a fila
      * @return quantos avisos sairam de ENVIANDO
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int tirarDaQuarentena(Duration quarentena) {
+        return jdbc.sql(SQL_TIRAR_DA_QUARENTENA).param(quarentena.toMillis() / 1000.0).update();
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int devolverLeasesExpirados(Duration lease, int maxTentativas) {
         return jdbc.sql(SQL_DEVOLVER_LEASE_EXPIRADO)

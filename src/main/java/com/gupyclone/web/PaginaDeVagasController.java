@@ -1,6 +1,6 @@
 package com.gupyclone.web;
 
-import com.gupyclone.candidaturas.CandidaturaController.CandidaturaResposta;
+import com.gupyclone.candidaturas.CandidaturaResposta;
 import com.gupyclone.candidaturas.CandidaturaDuplicadaException;
 import com.gupyclone.candidaturas.ServicoDeCandidaturas;
 import com.gupyclone.candidaturas.VagaFechadaException;
@@ -81,7 +81,7 @@ public class PaginaDeVagasController {
     }
 
     private List<CandidaturaResposta> minhasCandidaturas(UsuarioAutenticado usuario) {
-        return candidaturas.doCandidato(usuario.entidadeId()).stream().map(CandidaturaResposta::de).toList();
+        return candidaturas.doCandidato(usuario.entidadeId());
     }
 
     private Optional<CandidaturaResposta> candidaturaDe(UsuarioAutenticado usuario, Long vagaId) {

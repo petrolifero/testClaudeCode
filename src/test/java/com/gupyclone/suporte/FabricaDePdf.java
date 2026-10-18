@@ -140,6 +140,65 @@ public final class FabricaDePdf {
         }
     }
 
+    /**
+     * PDF valido, leve em bytes e caro em processamento: muitas paginas sem
+     * camada de texto. Serve para provar que existe teto de paginas antes de
+     * qualquer rasterizacao.
+     */
+    public static byte[] muitasPaginasSemTexto(int quantidade) {
+        try (PDDocument documento = new PDDocument()) {
+            for (int pagina = 0; pagina < quantidade; pagina++) {
+                documento.addPage(new PDPage(PDRectangle.A4));
+            }
+            return emBytes(documento);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Uma pagina unica com dimensoes enormes declaradas no MediaBox. Rasterizar
+     * isso estourava o heap com OutOfMemoryError, que por ser Error escapava do
+     * tratamento de erro e nunca virava recusa.
+     */
+    public static byte[] paginaGigantesca(float lado) {
+        try (PDDocument documento = new PDDocument()) {
+            documento.addPage(new PDPage(new PDRectangle(lado, lado)));
+            return emBytes(documento);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * PDF com camada de texto longa de verdade, para exercitar o teto de
+     * tamanho do texto guardado (o tsvector do PostgreSQL recusa acima de 1 MB).
+     */
+    public static byte[] camadaDeTextoEnorme(int paginas, int linhasPorPagina) {
+        try (PDDocument documento = new PDDocument()) {
+            var fonte = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+            for (int pagina = 0; pagina < paginas; pagina++) {
+                PDPage folha = new PDPage(PDRectangle.A4);
+                documento.addPage(folha);
+                try (PDPageContentStream conteudo = new PDPageContentStream(documento, folha)) {
+                    conteudo.beginText();
+                    conteudo.setFont(fonte, 4);
+                    conteudo.setLeading(5);
+                    conteudo.newLineAtOffset(20, 820);
+                    for (int linha = 0; linha < linhasPorPagina; linha++) {
+                        conteudo.showText("Java Spring PostgreSQL experiencia desenvolvimento plataforma "
+                                + "integracao mensageria observabilidade " + pagina + "-" + linha);
+                        conteudo.newLine();
+                    }
+                    conteudo.endText();
+                }
+            }
+            return emBytes(documento);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static BufferedImage desenhar(String... linhas) {
         BufferedImage imagem = new BufferedImage(LARGURA_EM_PIXELS, ALTURA_EM_PIXELS, BufferedImage.TYPE_INT_RGB);
         Graphics2D grafico = imagem.createGraphics();

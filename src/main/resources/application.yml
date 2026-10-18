@@ -46,14 +46,24 @@ gupy:
     intervalo: PT0.5S
     lote: 10
     max-tentativas: 3
+    # Atraso exponencial a partir daqui: 5s, 10s, 20s.
     espera-apos-falha: PT5S
-    lease: PT5M
+    # Dimensionado pelo PIOR caso do lote: lote 10 x timeout de LLM 30s = 300s,
+    # que era exatamente o lease antigo. Com margem, dois workers nao pegam a
+    # mesma candidatura por expiracao prematura.
+    lease: PT15M
+    # Passado este tempo, um job FALHO volta para a fila.
+    quarentena: PT1H
   ocr:
     idiomas: ${GUPY_OCR_IDIOMAS:por+eng}
     datapath: ${GUPY_OCR_DATAPATH:/usr/share/tesseract-ocr/5/tessdata}
     dpi: 300
     minimo-de-caracteres-na-camada-de-texto: 40
     executavel: ${GUPY_OCR_EXECUTAVEL:tesseract}
+    # Tetos de custo da rasterizacao: um PDF de 211 KB pode declarar 20.000
+    # paginas, e uma pagina pode declarar um MediaBox gigante.
+    max-paginas: 30
+    max-pixels-por-pagina: 50000000
   email:
     remetente: naoresponda@gupyclone.com.br
     intervalo: PT0.5S
@@ -61,6 +71,7 @@ gupy:
     max-tentativas: 3
     espera-apos-falha: PT5S
     lease: PT5M
+    quarentena: PT1H
   llm:
     base-url: ${GUPY_LLM_BASE_URL:https://api.anthropic.com}
     api-key: ${GUPY_LLM_API_KEY:}

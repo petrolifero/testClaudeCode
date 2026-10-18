@@ -38,11 +38,15 @@ public class ServicoDeVagas {
     }
 
     private final VagaRepository vagas;
+    private final ValidadorDeExpressaoDeBusca validador;
     private final RecrutadorRepository recrutadores;
 
-    public ServicoDeVagas(VagaRepository vagas, RecrutadorRepository recrutadores) {
+    public ServicoDeVagas(VagaRepository vagas,
+                          RecrutadorRepository recrutadores,
+                          ValidadorDeExpressaoDeBusca validador) {
         this.vagas = vagas;
         this.recrutadores = recrutadores;
+        this.validador = validador;
     }
 
     public Vaga publicar(Long recrutadorId,
@@ -62,9 +66,16 @@ public class ServicoDeVagas {
                 pontuacaoMinima);
         if (criterios != null) {
             for (NovoCriterio novo : criterios) {
+                String descricaoDoCriterio = texto(novo.descricao(), MAXIMO_DO_CRITERIO,
+                        "a descrição do critério");
+                String expressao = texto(novo.expressao(), MAXIMO_DO_CRITERIO,
+                        "a expressão do critério");
+                // Recusa aqui expressao que nenhum curriculo poderia atender:
+                // e o unico momento em que o RH pode corrigir.
+                validador.exigirUtil(descricaoDoCriterio, expressao);
                 vaga.adicionarCriterio(new CriterioAceite(
-                        texto(novo.descricao(), MAXIMO_DO_CRITERIO, "a descrição do critério"),
-                        texto(novo.expressao(), MAXIMO_DO_CRITERIO, "a expressão do critério"),
+                        descricaoDoCriterio,
+                        expressao,
                         novo.peso(),
                         novo.obrigatorio()));
             }

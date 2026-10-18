@@ -37,6 +37,7 @@ public class ConfiguracaoDaTriagem {
     @Bean
     @Primary
     AnalisadorDeCandidatura analisadorDaEstrategia(List<AnalisadorDeCandidatura> disponiveis,
+                                                   AnalisadorFullTextSearch busca,
                                                    PropriedadesTriagem propriedades) {
         AnalisadorDeCandidatura escolhido = disponiveis.stream()
                 .filter(analisador -> analisador.nome().equals(propriedades.estrategia()))
@@ -45,7 +46,24 @@ public class ConfiguracaoDaTriagem {
                         "gupy.triagem.estrategia nao casa com nenhum analisador: '" + propriedades.estrategia()
                                 + "'. disponiveis: " + nomes(disponiveis)));
         log.info("triagem usando a estrategia '{}' ({})", escolhido.nome(), escolhido.getClass().getSimpleName());
-        return escolhido;
+        return comVetoDeObrigatorios(escolhido, busca);
+    }
+
+    /**
+     * Envolve a estrategia escolhida no veto de criterios obrigatorios.
+     *
+     * <p>O analisador textual nao e envolvido porque ele proprio ja decide pela
+     * mesma consulta: envolve-lo custaria uma ida ao banco por analise sem
+     * mudar nenhum veredito. Qualquer outra estrategia, que decide por meio
+     * influenciavel pelo texto do candidato, passa pelo veto.
+     */
+    private static AnalisadorDeCandidatura comVetoDeObrigatorios(AnalisadorDeCandidatura escolhido,
+                                                                 AnalisadorFullTextSearch busca) {
+        if (escolhido instanceof AnalisadorFullTextSearch) {
+            return escolhido;
+        }
+        log.info("veto de criterios obrigatorios ativo sobre a estrategia '{}'", escolhido.nome());
+        return new AnalisadorComVetoDeObrigatorios(escolhido, busca);
     }
 
     private static List<String> nomes(List<AnalisadorDeCandidatura> disponiveis) {

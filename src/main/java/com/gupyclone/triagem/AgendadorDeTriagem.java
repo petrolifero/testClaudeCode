@@ -31,6 +31,10 @@ public class AgendadorDeTriagem {
      */
     @Scheduled(fixedDelayString = "${gupy.triagem.intervalo}")
     void varrer() {
+        // A quarentena vem antes de tudo: e o que impede que FALHO seja
+        // terminal. Uma indisponibilidade curta esgota as tentativas; passada a
+        // quarentena, o item volta para a fila em vez de ficar esquecido.
+        processador.reenfileirarOsQueFalharam();
         processador.recuperarLeasesExpirados();
         processador.processarUmLote();
     }

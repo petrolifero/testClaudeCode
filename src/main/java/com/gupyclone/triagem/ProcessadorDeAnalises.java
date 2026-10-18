@@ -118,6 +118,16 @@ public class ProcessadorDeAnalises {
         return reivindicador.devolverLeasesExpirados(propriedades.lease(), propriedades.maxTentativas());
     }
 
+    /**
+     * Devolve a fila os jobs que esgotaram as tentativas ha mais de
+     * {@code gupy.triagem.quarentena}.
+     *
+     * @return quantos voltaram
+     */
+    public int reenfileirarOsQueFalharam() {
+        return reivindicador.tirarDaQuarentena(propriedades.quarentena());
+    }
+
     private boolean processar(Long jobId) {
         ContextoDaAnalise contexto = leitura.execute(status -> montarContexto(jobId));
         if (contexto == null) {

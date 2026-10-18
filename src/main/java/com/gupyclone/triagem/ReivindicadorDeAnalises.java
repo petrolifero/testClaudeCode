@@ -54,6 +54,25 @@ public class ReivindicadorDeAnalises {
                and reivindicado_em < now() - make_interval(secs => ?)
             """;
 
+    /**
+     * Devolve a fila os jobs que esgotaram as tentativas tempo suficiente atras.
+     *
+     * <p>Sem isto, FALHO era terminal: nenhum SQL o selecionava e nenhum
+     * agendador o olhava, de modo que uma indisponibilidade de segundos da
+     * analise deixava a candidatura em RECEBIDA para sempre, sem decisao e sem
+     * e-mail, recuperavel apenas por SQL manual. Isso contradizia a promessa
+     * central do projeto.
+     */
+    private static final String SQL_TIRAR_DA_QUARENTENA = """
+            update analise_job
+               set status = 'PENDENTE',
+                   tentativas = 0,
+                   disponivel_em = now(),
+                   atualizado_em = now()
+             where status = 'FALHO'
+               and atualizado_em < now() - make_interval(secs => ?)
+            """;
+
     private final JdbcClient jdbc;
 
     public ReivindicadorDeAnalises(JdbcClient jdbc) {
@@ -80,6 +99,15 @@ public class ReivindicadorDeAnalises {
      *                      voltar para a fila
      * @return quantos jobs sairam de PROCESSANDO
      */
+    /**
+     * @param quarentena tempo minimo em FALHO antes de tentar de novo
+     * @return quantos jobs voltaram para a fila
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int tirarDaQuarentena(Duration quarentena) {
+        return jdbc.sql(SQL_TIRAR_DA_QUARENTENA).param(quarentena.toMillis() / 1000.0).update();
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int devolverLeasesExpirados(Duration lease, int maxTentativas) {
         return jdbc.sql(SQL_DEVOLVER_LEASE_EXPIRADO)

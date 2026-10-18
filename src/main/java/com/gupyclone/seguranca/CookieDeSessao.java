@@ -1,6 +1,10 @@
 package com.gupyclone.seguranca;
 
 import com.gupyclone.config.PropriedadesJwt;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.Arrays;
+import java.util.Optional;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +31,19 @@ public class CookieDeSessao {
                 .path("/")
                 .maxAge(propriedades.validade())
                 .build();
+    }
+
+    /** Token de sessao presente na requisicao, se houver. */
+    public Optional<String> tokenNaRequisicao(HttpServletRequest requisicao) {
+        Cookie[] presentes = requisicao.getCookies();
+        if (presentes == null) {
+            return Optional.empty();
+        }
+        return Arrays.stream(presentes)
+                .filter(cookie -> propriedades.cookie().equals(cookie.getName()))
+                .map(Cookie::getValue)
+                .filter(valor -> valor != null && !valor.isBlank())
+                .findFirst();
     }
 
     public ResponseCookie expirado() {

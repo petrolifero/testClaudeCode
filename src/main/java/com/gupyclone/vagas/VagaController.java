@@ -88,6 +88,25 @@ public class VagaController {
         public record CriterioResposta(Long id, String descricao, String expressao, int peso, boolean obrigatorio) {
         }
 
+        /**
+         * Versao para quem nao e o RH dono da vaga: sem a expressao de busca.
+         *
+         * <p>A expressao e o criterio de triagem em forma executavel — inclui
+         * negativas como {@code -php}. Entregar isso ao candidato e dizer
+         * exatamente o que escrever no curriculo para passar, e a interface
+         * nunca a mostrou; era a API que vazava.
+         */
+        public static VagaResposta semExpressoes(Vaga vaga) {
+            VagaResposta completa = de(vaga);
+            return new VagaResposta(completa.id(), completa.titulo(), completa.descricao(),
+                    completa.status(), completa.pontuacaoMinima(), completa.recrutador(),
+                    completa.criterios().stream()
+                            .map(criterio -> new CriterioResposta(criterio.id(), criterio.descricao(),
+                                    null, criterio.peso(), criterio.obrigatorio()))
+                            .toList(),
+                    completa.criadoEm());
+        }
+
         public static VagaResposta de(Vaga vaga) {
             return new VagaResposta(
                     vaga.getId(),
@@ -126,12 +145,20 @@ public class VagaController {
     }
 
     @GetMapping
-    public List<VagaResposta> abertas() {
-        return vagas.abertas().stream().map(VagaResposta::de).toList();
+    public List<VagaResposta> abertas(@AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return vagas.abertas().stream().map(vaga -> paraQuemPergunta(vaga, usuario)).toList();
     }
 
     @GetMapping("/{id}")
-    public VagaResposta porId(@PathVariable Long id) {
-        return VagaResposta.de(vagas.porId(id));
+    public VagaResposta porId(@PathVariable Long id, @AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return paraQuemPergunta(vagas.porId(id), usuario);
+    }
+
+    /** So o RH dono da vaga ve as expressoes de busca dos criterios. */
+    private static VagaResposta paraQuemPergunta(Vaga vaga, UsuarioAutenticado usuario) {
+        boolean ehODono = usuario != null
+                && usuario.ehRh()
+                && usuario.entidadeId().equals(vaga.getRecrutador().getId());
+        return ehODono ? VagaResposta.de(vaga) : VagaResposta.semExpressoes(vaga);
     }
 }

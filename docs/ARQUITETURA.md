@@ -36,6 +36,14 @@ Três camadas, cada uma suficiente contra um modo de falha diferente:
 5. **Não duplicar e-mail** — `unique (candidatura_id, tipo)` em `email_outbox`,
    gravado na mesma transação da conclusão.
 
+6. Esgotadas as tentativas o item vai para `FALHO`, e a **quarentena**
+   (`gupy.triagem.quarentena` / `gupy.email.quarentena`) o devolve à fila
+   depois de um tempo, com as tentativas zeradas. `FALHO` é descanso, não
+   túmulo: sem isso, uma indisponibilidade de segundos da análise deixava a
+   candidatura sem decisão para sempre.
+7. O atraso entre tentativas é **exponencial**: com atraso fixo, três
+   tentativas se esgotavam em dez segundos.
+
 Reprocessar é portanto inofensivo: o resultado é sempre uma transição de estado
 e um e-mail. O envio SMTP em si é *at-least-once* (um processo que morra entre o
 `send` e o commit reenvia) — isso está documentado e é o limite honesto de
@@ -68,7 +76,7 @@ com.gupyclone
 | Método | Rota | Papel | Resposta |
 |---|---|---|---|
 | `GET` | `/api/auth/personas` | público | `[{chave, nome, papel}]` |
-| `POST` | `/api/auth/entrar/{chave}` | público | `{token, chave, nome, papel, entidadeId}`; **409** se já autenticado |
+| `POST` | `/api/auth/entrar/{chave}` | público | `{token, chave, nome, papel, entidadeId}`; **409** se já autenticado (por `Bearer` **ou** por cookie). Não emite cookie: cookie é do fluxo HTML |
 | `POST` | `/api/auth/sair` | público | 204 e cookie expirado |
 | `GET` | `/api/eu` | autenticado | `{chave, nome, papel, entidadeId}`; 401 se anônimo |
 
@@ -81,6 +89,9 @@ com.gupyclone
 | `GET` | `/api/vagas/{id}` | autenticado | `VagaResposta`; 404 se não existir |
 
 `VagaResposta`: `{id, titulo, descricao, status, pontuacaoMinima, recrutador:{id,nome}, criterios:[{id, descricao, expressao, peso, obrigatorio}], criadoEm}`
+
+`expressao` vem **`null`** para quem não é o RH dono da vaga: ela é o critério
+de triagem em forma executável e diria ao candidato o que escrever para passar.
 
 ### Candidaturas
 

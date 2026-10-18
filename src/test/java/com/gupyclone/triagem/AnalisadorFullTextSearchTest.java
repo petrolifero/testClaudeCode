@@ -187,7 +187,30 @@ class AnalisadorFullTextSearchTest extends TesteDeTriagem {
 
         ResultadoDaAnalise resultado = analisador.analisar(contextoDe(candidatura));
 
-        assertThat(resultado.pontuacao()).isBetween(0, 100);
+        // isBetween(0, 100) sozinho seria VACUO: o construtor de
+        // ResultadoDaAnalise ja recusa valor fora dessa faixa, logo nenhum
+        // resultado construivel poderia falhar essa asserticao.
+        //
+        // O comportamento real, que vale fixar: a pontuacao do lixo e
+        // descartada e as palavras que sobram ficam ligadas por E. Aqui sobram
+        // "java" E "postgres", e "postgres" NAO casa com "PostgreSQL" depois da
+        // radicalizacao -- por isso o criterio nao e atendido. O ponto do teste
+        // e que isso vira um veredito, nao um erro de sintaxe.
+        assertThat(resultado.pontuacao()).isZero();
+        assertThat(resultado.criteriosNaoAtendidos()).containsExactly("Expressão torta");
+    }
+
+    @Test
+    @DisplayName("pontuacao solta na expressao e descartada, e o termo que sobra casa")
+    void pontuacaoNaExpressaoEDescartada() {
+        Vaga vaga = publicarVaga("Pessoa de Backend", 0,
+                new NovoCriterio("Java mesmo com lixo", "java & | ! ( :* ", 100, false));
+        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+
+        ResultadoDaAnalise resultado = analisador.analisar(contextoDe(candidatura));
+
+        assertThat(resultado.pontuacao()).isEqualTo(100);
+        assertThat(resultado.criteriosAtendidos()).containsExactly("Java mesmo com lixo");
     }
 
     @Test

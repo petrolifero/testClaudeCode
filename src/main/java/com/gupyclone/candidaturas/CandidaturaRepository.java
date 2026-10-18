@@ -21,6 +21,36 @@ public interface CandidaturaRepository extends JpaRepository<Candidatura, Long> 
     List<Candidatura> findAllByStatus(StatusCandidatura status);
 
     /**
+     * Listagem por projecao: do curriculo le apenas a origem do texto, sem
+     * trazer o PDF em bytea nem o texto extraido para a memoria.
+     *
+     * <p>Existe por um custo medido: byte[] nao e preguicoso sem enhancement
+     * de bytecode, entao inicializar a associacao do curriculo para ler um
+     * unico enum carregava o PDF inteiro em TODA listagem.
+     */
+    @Query("""
+            select new com.gupyclone.candidaturas.CandidaturaResposta(
+                       c.id, c.vaga.id, c.vaga.titulo, c.candidato.id, c.candidato.nome,
+                       c.status, c.pontuacao, c.motivo, c.curriculo.origemTexto,
+                       c.criadoEm, c.analisadaEm)
+              from Candidatura c
+             where c.candidato.id = :candidatoId
+             order by c.criadoEm desc
+            """)
+    List<CandidaturaResposta> resumosDoCandidato(@Param("candidatoId") Long candidatoId);
+
+    @Query("""
+            select new com.gupyclone.candidaturas.CandidaturaResposta(
+                       c.id, c.vaga.id, c.vaga.titulo, c.candidato.id, c.candidato.nome,
+                       c.status, c.pontuacao, c.motivo, c.curriculo.origemTexto,
+                       c.criadoEm, c.analisadaEm)
+              from Candidatura c
+             where c.vaga.id = :vagaId
+             order by c.criadoEm desc
+            """)
+    List<CandidaturaResposta> resumosDaVaga(@Param("vagaId") Long vagaId);
+
+    /**
      * Transicao de estado idempotente: so muda quem ainda esta em RECEBIDA.
      *
      * <p>Retorna 1 quando esta chamada foi a que concluiu a candidatura e 0

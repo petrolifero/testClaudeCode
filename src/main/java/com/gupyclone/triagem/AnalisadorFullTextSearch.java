@@ -1,5 +1,6 @@
 package com.gupyclone.triagem;
 
+import com.gupyclone.comum.BuscaTextual;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -43,11 +44,11 @@ public class AnalisadorFullTextSearch implements AnalisadorDeCandidatura {
      * linhas, e nao como reprovacao silenciosa.
      */
     private static final String SQL_ATENDIMENTO = """
-            select c.id, cv.texto_busca @@ websearch_to_tsquery('portugues_sem_acento', c.expressao) as atende
+            select c.id, cv.texto_busca @@ websearch_to_tsquery('%s', c.expressao) as atende
               from curriculo cv
              cross join (values %s) as c (id, expressao)
              where cv.id = :curriculo
-            """;
+            """.formatted(BuscaTextual.CONFIGURACAO, "%s");
 
     private final JdbcClient jdbc;
 
@@ -62,7 +63,7 @@ public class AnalisadorFullTextSearch implements AnalisadorDeCandidatura {
 
     @Override
     public ResultadoDaAnalise analisar(ContextoDaAnalise contexto) {
-        Set<Long> atendidos = idsAtendidos(contexto);
+        Set<Long> atendidos = criteriosAtendidos(contexto);
 
         List<String> descricoesAtendidas = new ArrayList<>();
         List<String> descricoesNaoAtendidas = new ArrayList<>();
@@ -91,7 +92,13 @@ public class AnalisadorFullTextSearch implements AnalisadorDeCandidatura {
                 : ResultadoDaAnalise.reprovada(pontuacao, motivo, descricoesAtendidas, descricoesNaoAtendidas);
     }
 
-    private Set<Long> idsAtendidos(ContextoDaAnalise contexto) {
+    /**
+     * Ids dos criterios que o curriculo atende, segundo o banco.
+     *
+     * <p>Publico porque o analisador por LLM o usa para conferir os criterios
+     * obrigatorios sem depender da palavra do modelo.
+     */
+    public Set<Long> criteriosAtendidos(ContextoDaAnalise contexto) {
         List<ContextoDaAnalise.Criterio> criterios = contexto.criterios();
         if (criterios.isEmpty()) {
             // Sem criterio nao ha o que consultar, e um values vazio nem seria

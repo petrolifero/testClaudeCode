@@ -26,34 +26,6 @@ import org.springframework.web.multipart.MultipartFile;
 public class CandidaturaController {
 
     /** Candidatura como a API a devolve, igual para o candidato e para o RH. */
-    public record CandidaturaResposta(Long id,
-                                      Long vagaId,
-                                      String tituloDaVaga,
-                                      Long candidatoId,
-                                      String nomeDoCandidato,
-                                      StatusCandidatura status,
-                                      Integer pontuacao,
-                                      String motivo,
-                                      OrigemTexto origemDoTexto,
-                                      OffsetDateTime criadoEm,
-                                      OffsetDateTime analisadaEm) {
-
-        public static CandidaturaResposta de(Candidatura candidatura) {
-            return new CandidaturaResposta(
-                    candidatura.getId(),
-                    candidatura.getVaga().getId(),
-                    candidatura.getVaga().getTitulo(),
-                    candidatura.getCandidato().getId(),
-                    candidatura.getCandidato().getNome(),
-                    candidatura.getStatus(),
-                    candidatura.getPontuacao(),
-                    candidatura.getMotivo(),
-                    candidatura.getCurriculo().getOrigemTexto(),
-                    candidatura.getCriadoEm(),
-                    candidatura.getAnalisadaEm());
-        }
-    }
-
     private final ServicoDeCandidaturas candidaturas;
 
     public CandidaturaController(ServicoDeCandidaturas candidaturas) {
@@ -84,9 +56,7 @@ public class CandidaturaController {
     @GetMapping("/api/candidaturas/minhas")
     @PreAuthorize("hasRole('CANDIDATO')")
     public List<CandidaturaResposta> minhas(@AuthenticationPrincipal UsuarioAutenticado usuario) {
-        return candidaturas.doCandidato(usuario.entidadeId()).stream()
-                .map(CandidaturaResposta::de)
-                .toList();
+        return candidaturas.doCandidato(usuario.entidadeId());
     }
 
     @GetMapping("/api/vagas/{id}/candidaturas")
@@ -94,7 +64,6 @@ public class CandidaturaController {
     public List<CandidaturaResposta> daVaga(@AuthenticationPrincipal UsuarioAutenticado usuario,
                                             @PathVariable("id") Long vagaId) {
         return candidaturas.daVaga(vagaId, usuario.entidadeId()).stream()
-                .map(CandidaturaResposta::de)
                 .toList();
     }
 

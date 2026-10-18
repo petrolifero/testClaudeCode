@@ -1,6 +1,8 @@
 package com.gupyclone.seguranca;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -49,17 +51,47 @@ public class SessaoApiController {
                 .toList();
     }
 
+    /**
+     * Entrar pela API.
+     *
+     * <p>Devolve o token no corpo e <strong>nao</strong> emite cookie: cookie e
+     * do fluxo HTML. Emitir cookie aqui era perigoso porque esta rota e
+     * publica e isenta de CSRF (a isencao se justifica justamente por a API nao
+     * aceitar cookie), de modo que um formulario em outro site conseguia trocar
+     * a persona do navegador da vitima.
+     *
+     * <p>A recusa de "ja autenticado" tambem olha o cookie, e nao apenas o
+     * contexto de seguranca: como o filtro ignora cookie em {@code /api/**}, um
+     * navegador logado chegava aqui como anonimo e trocava de pessoa sem sair,
+     * contra o 409 que o contrato promete.
+     */
     @PostMapping("/api/auth/entrar/{chave}")
-    public ResponseEntity<RespostaDeEntrada> entrar(@PathVariable String chave) {
-        usuarioAtual.obter().ifPresent(usuario -> {
-            throw new JaAutenticadoException(usuario.chave());
+    public ResponseEntity<RespostaDeEntrada> entrar(@PathVariable String chave,
+                                                   HttpServletRequest requisicao) {
+        sessaoJaExistente(requisicao).ifPresent(chaveAtual -> {
+            throw new JaAutenticadoException(chaveAtual);
         });
         UsuarioAutenticado usuario = personas.resolver(chave);
         String token = tokens.emitir(usuario);
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookies.comToken(token).toString())
                 .body(new RespostaDeEntrada(token, usuario.chave(), usuario.nome(), usuario.papel(),
                         usuario.entidadeId()));
+    }
+
+    /** Chave de quem ja esta autenticado, seja por Bearer, seja por cookie. */
+    private Optional<String> sessaoJaExistente(HttpServletRequest requisicao) {
+        Optional<String> doContexto = usuarioAtual.obter().map(UsuarioAutenticado::chave);
+        if (doContexto.isPresent()) {
+            return doContexto;
+        }
+        return cookies.tokenNaRequisicao(requisicao).flatMap(token -> {
+            try {
+                return Optional.of(tokens.ler(token).chave());
+            } catch (TokenInvalidoException e) {
+                // Cookie velho ou invalido nao e sessao: deixa entrar.
+                return Optional.empty();
+            }
+        });
     }
 
     @PostMapping("/api/auth/sair")

@@ -1,13 +1,10 @@
 package com.gupyclone.seguranca;
 
-import com.gupyclone.config.PropriedadesJwt;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -35,14 +32,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class FiltroDeAutenticacaoJwt extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(FiltroDeAutenticacaoJwt.class);
-    private static final String PREFIXO_API = "/api/";
 
     private final ServicoDeToken servicoDeToken;
-    private final PropriedadesJwt propriedades;
+    private final CookieDeSessao cookies;
 
-    public FiltroDeAutenticacaoJwt(ServicoDeToken servicoDeToken, PropriedadesJwt propriedades) {
+    public FiltroDeAutenticacaoJwt(ServicoDeToken servicoDeToken, CookieDeSessao cookies) {
         this.servicoDeToken = servicoDeToken;
-        this.propriedades = propriedades;
+        this.cookies = cookies;
     }
 
     @Override
@@ -67,24 +63,11 @@ public class FiltroDeAutenticacaoJwt extends OncePerRequestFilter {
     }
 
     private boolean ehRequisicaoDeApi(HttpServletRequest requisicao) {
-        String caminho = requisicao.getRequestURI();
-        String contexto = requisicao.getContextPath();
-        if (contexto != null && !contexto.isEmpty() && caminho.startsWith(contexto)) {
-            caminho = caminho.substring(contexto.length());
-        }
-        return caminho.startsWith(PREFIXO_API);
+        return RequisicoesDaApi.ehApi(requisicao);
     }
 
     private Optional<String> cookieDeSessao(HttpServletRequest requisicao) {
-        Cookie[] cookies = requisicao.getCookies();
-        if (cookies == null) {
-            return Optional.empty();
-        }
-        return Arrays.stream(cookies)
-                .filter(cookie -> propriedades.cookie().equals(cookie.getName()))
-                .map(Cookie::getValue)
-                .filter(valor -> valor != null && !valor.isBlank())
-                .findFirst();
+        return cookies.tokenNaRequisicao(requisicao);
     }
 
     private void autenticar(String token, HttpServletRequest requisicao) {

@@ -34,12 +34,14 @@ gupy:
     max-tentativas: 3
     espera-apos-falha: PT0S
     lease: PT5M
+    quarentena: PT1H
   email:
     intervalo: PT1H
     lote: 10
     max-tentativas: 3
     espera-apos-falha: PT0S
     lease: PT5M
+    quarentena: PT1H
 
 logging:
   level:

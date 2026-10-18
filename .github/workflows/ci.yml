@@ -1,8 +1,11 @@
 name: CI
 
 on:
+  # Restrito a main de proposito: com "branches: [**]" uma branch em PR
+  # disparava push E pull_request, rodando a suite duas vezes por commit e
+  # gastando o dobro de runner.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
 
 jobs:

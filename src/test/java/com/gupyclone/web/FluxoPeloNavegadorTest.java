@@ -119,12 +119,18 @@ class FluxoPeloNavegadorTest extends TesteDeInterface {
                 FabricaDePdf.somenteImagem("Joao Lima", "Desenvolvedor Java com Spring Boot"));
         assertThat(envio.status()).isEqualTo(302);
 
-        processador.processarUmLote();
+        assertThat(processador.processarUmLote())
+                .as("a candidatura foi de fato analisada")
+                .isEqualTo(1);
 
         var minhas = doJoao.abrir("/minhas-candidaturas").html();
         assertThat(minhas.select(".candidaturas tbody tr").text())
                 .as("a interface mostra que o texto veio de OCR")
                 .contains("digitalizado (OCR)");
+        // Sem esta asserticao o teste passaria mesmo se a triagem nunca
+        // rodasse: "digitalizado (OCR)" vem da submissao, nao da decisao.
+        assertThat(minhas.selectFirst(".selo").text()).isEqualTo("APROVADA");
+        assertThat(minhas.selectFirst("td.motivo").text()).isNotBlank();
     }
 
     @Test

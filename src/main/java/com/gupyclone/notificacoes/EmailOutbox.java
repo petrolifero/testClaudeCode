@@ -1,6 +1,7 @@
 package com.gupyclone.notificacoes;
 
 import com.gupyclone.candidaturas.Candidatura;
+import com.gupyclone.comum.AtrasoDeReentrega;
 import com.gupyclone.comum.EntidadeComId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -90,6 +91,9 @@ public class EmailOutbox extends EntidadeComId {
 
     /** Marca o e-mail como entregue ao servidor SMTP. */
     public void marcarEnviado() {
+        if (status != StatusEmail.ENVIANDO) {
+            return;
+        }
         this.status = StatusEmail.ENVIADO;
         this.reivindicadoEm = null;
         this.enviadoEm = OffsetDateTime.now();
@@ -100,13 +104,19 @@ public class EmailOutbox extends EntidadeComId {
      * tentativas; esgotadas, vira FALHO.
      */
     public void registrarFalha(String erro, int maxTentativas, java.time.Duration esperaAposFalha) {
+        if (status != StatusEmail.ENVIANDO) {
+            return;
+        }
         this.ultimoErro = erro;
         this.reivindicadoEm = null;
         if (tentativas >= maxTentativas) {
             this.status = StatusEmail.FALHO;
         } else {
             this.status = StatusEmail.PENDENTE;
-            this.disponivelEm = OffsetDateTime.now().plus(esperaAposFalha);
+            // Atraso exponencial, pela mesma razao da fila de analise: com
+            // atraso fixo as tentativas se esgotam em segundos.
+            this.disponivelEm = OffsetDateTime.now()
+                    .plus(AtrasoDeReentrega.apos(esperaAposFalha, tentativas));
         }
     }
 

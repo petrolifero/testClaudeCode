@@ -17,9 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
  * Base dos testes de candidatura: as personas e uma vaga aberta de verdade.
  *
  * <p>As pessoas extras ({@code bia} e os candidatos de concorrencia) nascem com
- * {@code findByChave(...).orElseGet(...)} porque o limpador de banco preserva
- * candidato e recrutador entre testes: recriar violaria o unique de chave e de
- * e-mail na segunda classe de teste da mesma JVM.
+ * {@code findByChave(...).orElseGet(...)}: o limpador devolve {@code candidato}
+ * e {@code recrutador} ao estado da migracao V2, portanto elas sao recriadas a
+ * cada teste. O {@code orElseGet} cobre tambem o caso de a pessoa ainda existir,
+ * em que recria-la violaria o unique de chave e de e-mail.
  */
 abstract class TesteDeCandidaturas extends TesteDeIntegracao {
 

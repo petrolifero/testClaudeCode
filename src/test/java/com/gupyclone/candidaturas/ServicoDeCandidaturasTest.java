@@ -60,14 +60,21 @@ class ServicoDeCandidaturasTest extends TesteDeCandidaturas {
         assertThat(nova.getCurriculo().getOrigemTexto()).isEqualTo(OrigemTexto.CAMADA_DE_TEXTO);
         assertThat(nova.getStatus()).isEqualTo(StatusCandidatura.RECEBIDA);
 
-        Candidatura daLista = servico.doCandidato(carlos).getFirst();
-        assertThat(daLista.getVaga().getTitulo()).isEqualTo(TITULO_DA_VAGA);
-        assertThat(daLista.getCandidato().getNome()).isEqualTo("Carlos Pereira");
-        assertThat(daLista.getCurriculo().getOrigemTexto()).isEqualTo(OrigemTexto.CAMADA_DE_TEXTO);
+        // As LISTAGENS vem por projecao, nao como entidade: nao ha associacao
+        // preguicosa para resolver e, principalmente, o PDF em bytea e o texto
+        // extraido nao sobem para a memoria so para exibir uma linha.
+        CandidaturaResposta daLista = servico.doCandidato(carlos).getFirst();
+        assertThat(daLista.tituloDaVaga()).isEqualTo(TITULO_DA_VAGA);
+        assertThat(daLista.nomeDoCandidato()).isEqualTo("Carlos Pereira");
+        assertThat(daLista.origemDoTexto()).isEqualTo(OrigemTexto.CAMADA_DE_TEXTO);
+        assertThat(daLista.status()).isEqualTo(StatusCandidatura.RECEBIDA);
+        assertThat(daLista.vagaId()).isEqualTo(vaga);
+        assertThat(daLista.criadoEm()).isNotNull();
 
-        Candidatura doRh = servico.daVaga(vaga, ana).getFirst();
-        assertThat(doRh.getCandidato().getNome()).isEqualTo("Carlos Pereira");
-        assertThat(doRh.getCurriculo().getNomeArquivo()).isEqualTo("carlos.pdf");
+        CandidaturaResposta doRh = servico.daVaga(vaga, ana).getFirst();
+        assertThat(doRh.nomeDoCandidato()).isEqualTo("Carlos Pereira");
+        assertThat(doRh.origemDoTexto()).isEqualTo(OrigemTexto.CAMADA_DE_TEXTO);
+        assertThat(doRh.candidatoId()).isEqualTo(carlos);
     }
 
     @Test

@@ -75,8 +75,17 @@ public class DespachanteDeEmails {
         List<Long> reivindicados = reivindicador.reivindicar(propriedades.lote());
         int enviados = 0;
         for (Long id : reivindicados) {
-            if (despachar(id)) {
-                enviados++;
+            try {
+                if (despachar(id)) {
+                    enviados++;
+                }
+            } catch (RuntimeException falha) {
+                // Um aviso problematico nao pode levar o lote embora: sem este
+                // catch, uma falha fora do envio (ler a linha, abrir a
+                // transacao de conclusao) abandonava os demais em ENVIANDO,
+                // onde so a expiracao do lease os resgataria. O processador de
+                // analises ja protegia o lote assim; aqui faltava.
+                log.error("falha inesperada ao despachar o aviso {}", id, falha);
             }
         }
         return enviados;
@@ -89,6 +98,11 @@ public class DespachanteDeEmails {
      */
     public int recuperarLeasesExpirados() {
         return reivindicador.devolverLeasesExpirados(propriedades.lease(), propriedades.maxTentativas());
+    }
+
+    /** Devolve a fila os avisos que esgotaram as tentativas ha tempo suficiente. */
+    public int reenfileirarOsQueFalharam() {
+        return reivindicador.tirarDaQuarentena(propriedades.quarentena());
     }
 
     private boolean despachar(Long id) {

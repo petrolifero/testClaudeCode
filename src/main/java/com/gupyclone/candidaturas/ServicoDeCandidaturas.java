@@ -130,8 +130,8 @@ public class ServicoDeCandidaturas {
     }
 
     @Transactional(readOnly = true)
-    public List<Candidatura> doCandidato(Long candidatoId) {
-        return carregadas(candidaturas.findAllByCandidatoIdOrderByCriadoEmDesc(candidatoId));
+    public List<CandidaturaResposta> doCandidato(Long candidatoId) {
+        return candidaturas.resumosDoCandidato(candidatoId);
     }
 
     /**
@@ -140,12 +140,12 @@ public class ServicoDeCandidaturas {
      * @throws AccessDeniedException se o recrutador nao for o dono da vaga
      */
     @Transactional(readOnly = true)
-    public List<Candidatura> daVaga(Long vagaId, Long recrutadorId) {
+    public List<CandidaturaResposta> daVaga(Long vagaId, Long recrutadorId) {
         Vaga vaga = vagas.findById(vagaId).orElseThrow(() -> new VagaInexistenteException(vagaId));
         if (recrutadorId == null || !vaga.getRecrutador().getId().equals(recrutadorId)) {
             throw new AccessDeniedException("somente quem publicou a vaga vê as candidaturas dela");
         }
-        return carregadas(candidaturas.findAllByVagaIdOrderByCriadoEmDesc(vagaId));
+        return candidaturas.resumosDaVaga(vagaId);
     }
 
     /**
@@ -189,8 +189,4 @@ public class ServicoDeCandidaturas {
         return candidatura;
     }
 
-    private static List<Candidatura> carregadas(List<Candidatura> encontradas) {
-        encontradas.forEach(ServicoDeCandidaturas::carregada);
-        return encontradas;
-    }
 }

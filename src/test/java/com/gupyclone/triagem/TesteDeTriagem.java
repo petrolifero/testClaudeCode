@@ -28,9 +28,10 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * processador o monta em producao. Assim um teste de analisador nao pode passar
  * com dados que o resto do sistema nunca produziria.
  *
- * <p>Pessoas extras nascem com {@code findByChave(...).orElseGet(...)} porque o
- * limpador de banco preserva candidato e recrutador entre testes: recriar
- * violaria o unique de chave e de e-mail.
+ * <p>Pessoas extras nascem com {@code findByChave(...).orElseGet(...)}: o
+ * limpador devolve {@code candidato} e {@code recrutador} ao estado da migracao
+ * V2, portanto elas sao recriadas a cada teste, e o {@code orElseGet} evita
+ * violar o unique de chave e de e-mail caso ainda existam.
  */
 abstract class TesteDeTriagem extends TesteDeIntegracao {
 

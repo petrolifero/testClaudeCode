@@ -1,6 +1,6 @@
 package com.gupyclone.web;
 
-import com.gupyclone.candidaturas.CandidaturaController.CandidaturaResposta;
+import com.gupyclone.candidaturas.CandidaturaResposta;
 import com.gupyclone.candidaturas.ServicoDeCandidaturas;
 import com.gupyclone.seguranca.UsuarioAutenticado;
 import com.gupyclone.vagas.ServicoDeVagas;
@@ -42,9 +42,7 @@ public class PaginaDoRhController {
         List<VagaComCandidaturas> lista = vagas.doRecrutador(usuario.entidadeId()).stream()
                 .map(vaga -> new VagaComCandidaturas(
                         VagaResposta.de(vaga),
-                        candidaturas.daVaga(vaga.getId(), usuario.entidadeId()).stream()
-                                .map(CandidaturaResposta::de)
-                                .toList()))
+                        candidaturas.daVaga(vaga.getId(), usuario.entidadeId())))
                 .toList();
         modelo.addAttribute("vagas", lista);
         return "rh/vagas";

@@ -13,6 +13,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param esperaAposFalha  atraso aplicado antes de uma nova tentativa
  * @param lease            depois disso um job reivindicado e considerado
  *                         abandonado e volta para PENDENTE
+ * @param quarentena       depois disso um job FALHO volta para a fila. Sem
+ *                         isso, uma indisponibilidade de segundos deixaria a
+ *                         candidatura sem decisao para sempre
  */
 @ConfigurationProperties(prefix = "gupy.triagem")
 public record PropriedadesTriagem(
@@ -21,5 +24,12 @@ public record PropriedadesTriagem(
         int lote,
         int maxTentativas,
         Duration esperaAposFalha,
-        Duration lease) {
+        Duration lease,
+        Duration quarentena) {
+
+    public PropriedadesTriagem {
+        if (quarentena == null || quarentena.isZero() || quarentena.isNegative()) {
+            quarentena = Duration.ofHours(1);
+        }
+    }
 }

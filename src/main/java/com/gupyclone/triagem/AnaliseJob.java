@@ -1,6 +1,7 @@
 package com.gupyclone.triagem;
 
 import com.gupyclone.candidaturas.Candidatura;
+import com.gupyclone.comum.AtrasoDeReentrega;
 import com.gupyclone.comum.EntidadeComId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -79,17 +80,36 @@ public class AnaliseJob extends EntidadeComId {
      * resultado da analise.
      */
     public void concluir() {
+        if (status != StatusJob.PROCESSANDO) {
+            // Guarda de estado, como a transicao da candidatura ja fazia: um
+            // worker atrasado nao reescreve um job que outro ja fechou.
+            return;
+        }
         this.status = StatusJob.CONCLUIDO;
         this.reivindicadoEm = null;
         this.atualizadoEm = OffsetDateTime.now();
     }
 
     /**
-     * Registra uma falha de processamento. Enquanto houver tentativas o job
-     * volta para a fila com um atraso; esgotadas as tentativas ele vira FALHO
-     * e deixa de ser reprocessado (mas permanece na tabela para auditoria).
+     * Registra uma falha de processamento.
+     *
+     * <p>Enquanto houver tentativas o job volta para a fila com atraso
+     * EXPONENCIAL. Com atraso fixo, as tentativas se esgotavam em poucos
+     * segundos: com espera de 5s e 3 tentativas, uma indisponibilidade de 10
+     * segundos da LLM era suficiente para marcar o job como FALHO. O
+     * exponencial faz as mesmas 3 tentativas cobrirem minutos.
+     *
+     * <p>Esgotadas as tentativas o job vira FALHO, de onde a quarentena o
+     * devolve mais tarde (ver ReivindicadorDeAnalises): FALHO e um descanso,
+     * nao um tumulo.
+     *
+     * <p>So age sobre job em PROCESSANDO: um worker atrasado, cujo lease ja
+     * expirou e cujo job ja foi concluido por outro, nao regride o estado.
      */
     public void registrarFalha(String erro, int maxTentativas, java.time.Duration esperaAposFalha) {
+        if (status != StatusJob.PROCESSANDO) {
+            return;
+        }
         this.ultimoErro = erro;
         this.reivindicadoEm = null;
         this.atualizadoEm = OffsetDateTime.now();
@@ -97,7 +117,8 @@ public class AnaliseJob extends EntidadeComId {
             this.status = StatusJob.FALHO;
         } else {
             this.status = StatusJob.PENDENTE;
-            this.disponivelEm = OffsetDateTime.now().plus(esperaAposFalha);
+            this.disponivelEm = OffsetDateTime.now()
+                    .plus(AtrasoDeReentrega.apos(esperaAposFalha, tentativas));
         }
     }
 

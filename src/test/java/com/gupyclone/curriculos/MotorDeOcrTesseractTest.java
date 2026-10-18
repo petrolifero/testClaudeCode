@@ -36,7 +36,7 @@ class MotorDeOcrTesseractTest {
     @Test
     @DisplayName("reconhece o texto de uma pagina rasterizada")
     void reconheceTextoDaPagina() throws IOException {
-        MotorDeOcr motor = new MotorDeOcrTesseract(new PropriedadesOcr("por+eng", DATAPATH, 300, 40, EXECUTAVEL));
+        MotorDeOcr motor = new MotorDeOcrTesseract(new PropriedadesOcr("por+eng", DATAPATH, 300, 40, EXECUTAVEL, 30, 50_000_000L));
 
         String reconhecido = motor.reconhecer(rasterizar(FabricaDePdf.somenteImagem(
                 "Carlos Pereira", "Desenvolvedor Java com Spring Boot")));
@@ -50,7 +50,7 @@ class MotorDeOcrTesseractTest {
         Path semIdiomas = Files.createTempDirectory("tessdata-vazio");
         try {
             MotorDeOcr motor = new MotorDeOcrTesseract(
-                    new PropriedadesOcr("por+eng", semIdiomas.toString(), 300, 40, EXECUTAVEL));
+                    new PropriedadesOcr("por+eng", semIdiomas.toString(), 300, 40, EXECUTAVEL, 30, 50_000_000L));
             BufferedImage pagina = rasterizar(FabricaDePdf.somenteImagem("Carlos Pereira"));
 
             assertThatThrownBy(() -> motor.reconhecer(pagina))
@@ -64,7 +64,7 @@ class MotorDeOcrTesseractTest {
     @Test
     @DisplayName("nao vaza arquivo temporario de OCR")
     void naoDeixaTemporarioParaTras() throws IOException {
-        MotorDeOcr motor = new MotorDeOcrTesseract(new PropriedadesOcr("por+eng", DATAPATH, 300, 40, EXECUTAVEL));
+        MotorDeOcr motor = new MotorDeOcrTesseract(new PropriedadesOcr("por+eng", DATAPATH, 300, 40, EXECUTAVEL, 30, 50_000_000L));
         BufferedImage pagina = rasterizar(FabricaDePdf.somenteImagem("Carlos Pereira"));
         long antes = temporariosDeOcr();
 
@@ -79,7 +79,7 @@ class MotorDeOcrTesseractTest {
         // So da para provar este caminho porque gupy.ocr.executavel e
         // configuravel: aqui aponta para um binario que nao existe.
         MotorDeOcr motor = new MotorDeOcrTesseract(
-                new PropriedadesOcr("por+eng", DATAPATH, 300, 40, "tesseract-que-nao-existe"));
+                new PropriedadesOcr("por+eng", DATAPATH, 300, 40, "tesseract-que-nao-existe", 30, 50_000_000L));
         BufferedImage pagina = rasterizar(FabricaDePdf.somenteImagem("Carlos Pereira"));
 
         assertThatExceptionOfType(OcrIndisponivelException.class)

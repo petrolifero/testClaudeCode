@@ -28,9 +28,9 @@ class ServicoDeVagasTest extends TesteDeIntegracao {
     @BeforeEach
     void localizarRecrutadoras() {
         ana = recrutadores.findByChave("ana").orElseThrow().getId();
-        // O limpador de banco preserva as pessoas semeadas, e esta segunda
-        // recrutadora sobrevive junto: por isso ela e reaproveitada quando ja
-        // existe, em vez de recriada (chave e e-mail sao unicos).
+        // O limpador devolve as pessoas ao estado da migracao V2, entao esta
+        // segunda recrutadora e recriada a cada teste; o orElseGet cobre o caso
+        // de ela ainda existir, em que recriar violaria o unique de chave.
         bia = recrutadores.findByChave("bia")
                 .orElseGet(() -> recrutadores.save(
                         new Recrutador("bia", "Bia Martins", "bia.martins@gupyclone.com.br")))
@@ -117,5 +117,33 @@ class ServicoDeVagasTest extends TesteDeIntegracao {
                 List.of(new ServicoDeVagas.NovoCriterio("Java", "java", 50, true),
                         new ServicoDeVagas.NovoCriterio("PostgreSQL", "postgresql or postgres", 30, false)))
                 .getId();
+    }
+
+    @Test
+    @DisplayName("expressao que nao procura nada e recusada na publicacao")
+    void expressaoInutilERecusada() {
+        // "-", "ou", "com": websearch_to_tsquery reduz tudo isso a uma tsquery
+        // VAZIA, que nao casa com curriculo nenhum. Se o criterio fosse
+        // obrigatorio, reprovaria todo candidato apontando algo que ninguem
+        // poderia cumprir, e nada avisava o RH.
+        // Espaco em branco nao entra aqui: ele e recusado antes, pela
+        // validacao de campo obrigatorio, com mensagem mais especifica.
+        for (String inutil : new String[]{"-", "ou", "com", "de", "!!!"}) {
+            assertThatThrownBy(() -> servico.publicar(ana, "Pessoa de Backend", "Descrição", 50,
+                    List.of(new ServicoDeVagas.NovoCriterio("Experiência com Java", inutil, 100, true))))
+                    .as("expressão %s", inutil)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("não procura nada");
+        }
+    }
+
+    @Test
+    @DisplayName("expressao com termo de verdade continua aceita")
+    void expressaoUtilEAceita() {
+        var vaga = servico.publicar(ana, "Pessoa de Backend", "Descrição", 50,
+                List.of(new ServicoDeVagas.NovoCriterio("Java", "java or jvm", 100, true),
+                        new ServicoDeVagas.NovoCriterio("Sem PHP", "-php", 10, false)));
+
+        assertThat(vaga.getCriterios()).hasSize(2);
     }
 }
