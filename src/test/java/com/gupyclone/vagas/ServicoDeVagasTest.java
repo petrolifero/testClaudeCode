@@ -3,6 +3,7 @@ package com.gupyclone.vagas;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.gupyclone.pessoas.ConsultaDePessoas;
 import com.gupyclone.pessoas.Recrutador;
 import com.gupyclone.pessoas.RecrutadorRepository;
 import com.gupyclone.suporte.TesteDeIntegracao;
@@ -21,6 +22,9 @@ class ServicoDeVagasTest extends TesteDeIntegracao {
 
     @Autowired
     private RecrutadorRepository recrutadores;
+
+    @Autowired
+    private ConsultaDePessoas pessoas;
 
     private Long ana;
     private Long bia;
@@ -82,13 +86,17 @@ class ServicoDeVagasTest extends TesteDeIntegracao {
     void vagasChegamComAssociacoesCarregadas() {
         Long vaga = publicarPor(ana, "Pessoa Desenvolvedora Java");
 
-        // Sem transacao em volta do teste: a vaga chega destacada, e ler
-        // recrutador e criterios aqui so funciona se o servico os carregou.
-        assertThat(servico.porId(vaga).getRecrutador().getNome()).isEqualTo("Ana Souza");
+        // Sem transacao em volta do teste: a vaga chega destacada, e ler os
+        // criterios aqui so funciona se o servico os trouxe no mesmo SELECT.
         assertThat(servico.porId(vaga).getCriterios()).hasSize(2);
-        assertThat(servico.abertas().getFirst().getRecrutador().getNome()).isEqualTo("Ana Souza");
         assertThat(servico.abertas().getFirst().getCriterios()).hasSize(2);
         assertThat(servico.doRecrutador(ana).getFirst().getCriterios()).hasSize(2);
+
+        // O recrutador deixou de ser associacao e passou a ser id: continua
+        // afirmado quem publicou, agora pela porta do modulo dono.
+        assertThat(servico.porId(vaga).getRecrutadorId()).isEqualTo(ana);
+        assertThat(servico.abertas().getFirst().getRecrutadorId()).isEqualTo(ana);
+        assertThat(pessoas.recrutador(ana).orElseThrow().nome()).isEqualTo("Ana Souza");
     }
 
     @Test

@@ -7,8 +7,9 @@ import com.gupyclone.candidaturas.VagaFechadaException;
 import com.gupyclone.comum.ErroDeNegocio;
 import com.gupyclone.curriculos.CurriculoInvalidoException;
 import com.gupyclone.seguranca.UsuarioAutenticado;
+import com.gupyclone.vagas.MontadorDeVagaResposta;
 import com.gupyclone.vagas.ServicoDeVagas;
-import com.gupyclone.vagas.VagaController.VagaResposta;
+import com.gupyclone.vagas.VagaResposta;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
@@ -29,16 +30,20 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class PaginaDeVagasController {
 
     private final ServicoDeVagas vagas;
+    private final MontadorDeVagaResposta montador;
     private final ServicoDeCandidaturas candidaturas;
 
-    public PaginaDeVagasController(ServicoDeVagas vagas, ServicoDeCandidaturas candidaturas) {
+    public PaginaDeVagasController(ServicoDeVagas vagas,
+                                   MontadorDeVagaResposta montador,
+                                   ServicoDeCandidaturas candidaturas) {
         this.vagas = vagas;
+        this.montador = montador;
         this.candidaturas = candidaturas;
     }
 
     @GetMapping("/vagas")
     public String listar(Model modelo) {
-        modelo.addAttribute("vagas", vagas.abertas().stream().map(VagaResposta::de).toList());
+        modelo.addAttribute("vagas", montador.completas(vagas.abertas()));
         return "vagas";
     }
 
@@ -46,7 +51,7 @@ public class PaginaDeVagasController {
     public String detalhar(@PathVariable Long id,
                            @AuthenticationPrincipal UsuarioAutenticado usuario,
                            Model modelo) {
-        VagaResposta vaga = VagaResposta.de(vagas.porId(id));
+        VagaResposta vaga = montador.completa(vagas.porId(id));
         modelo.addAttribute("vaga", vaga);
         // Candidato que ja se inscreveu ve o andamento no lugar do formulario.
         modelo.addAttribute("minhaCandidatura", usuario.ehCandidato()

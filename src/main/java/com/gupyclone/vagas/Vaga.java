@@ -1,15 +1,12 @@
 package com.gupyclone.vagas;
 
 import com.gupyclone.comum.EntidadeComId;
-import com.gupyclone.pessoas.Recrutador;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -18,7 +15,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Vaga publicada pelo RH, com seus criterios de aceite. */
+/**
+ * Vaga publicada pelo RH, com seus criterios de aceite.
+ *
+ * <p>O recrutador entra por id: ele e outro agregado, e quem precisa do nome
+ * dele pergunta a porta de pessoas. Os criterios, ao contrario, sao parte desta
+ * vaga e continuam por objeto.
+ */
 @Entity
 @Table(name = "vaga")
 public class Vaga extends EntidadeComId {
@@ -29,9 +32,8 @@ public class Vaga extends EntidadeComId {
     @Column(name = "descricao", nullable = false, columnDefinition = "text")
     private String descricao;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "recrutador_id", nullable = false)
-    private Recrutador recrutador;
+    @Column(name = "recrutador_id", nullable = false, updatable = false)
+    private Long recrutadorId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -49,13 +51,19 @@ public class Vaga extends EntidadeComId {
     protected Vaga() {
     }
 
-    public Vaga(String titulo, String descricao, Recrutador recrutador, int pontuacaoMinima) {
+    public Vaga(String titulo, String descricao, Long recrutadorId, int pontuacaoMinima) {
         if (pontuacaoMinima < 0 || pontuacaoMinima > 100) {
             throw new IllegalArgumentException("pontuacao minima deve estar entre 0 e 100");
         }
+        // Id nulo recusado aqui, e nao so no servico: sem isso o not null da
+        // coluna viraria DataIntegrityViolationException no flush, longe de quem
+        // errou.
+        if (recrutadorId == null) {
+            throw new IllegalArgumentException("vaga exige o id do recrutador");
+        }
         this.titulo = titulo;
         this.descricao = descricao;
-        this.recrutador = recrutador;
+        this.recrutadorId = recrutadorId;
         this.pontuacaoMinima = pontuacaoMinima;
         this.status = StatusVaga.ABERTA;
     }
@@ -81,6 +89,11 @@ public class Vaga extends EntidadeComId {
         return status == StatusVaga.ABERTA;
     }
 
+    /** @return true se quem pergunta e quem publicou a vaga */
+    public boolean ehDoRecrutador(Long recrutadorId) {
+        return this.recrutadorId.equals(recrutadorId);
+    }
+
     public String getTitulo() {
         return titulo;
     }
@@ -89,8 +102,8 @@ public class Vaga extends EntidadeComId {
         return descricao;
     }
 
-    public Recrutador getRecrutador() {
-        return recrutador;
+    public Long getRecrutadorId() {
+        return recrutadorId;
     }
 
     public StatusVaga getStatus() {

@@ -3,9 +3,10 @@ package com.gupyclone.web;
 import com.gupyclone.candidaturas.CandidaturaResposta;
 import com.gupyclone.candidaturas.ServicoDeCandidaturas;
 import com.gupyclone.seguranca.UsuarioAutenticado;
+import com.gupyclone.vagas.MontadorDeVagaResposta;
 import com.gupyclone.vagas.ServicoDeVagas;
 import com.gupyclone.vagas.ServicoDeVagas.NovoCriterio;
-import com.gupyclone.vagas.VagaController.VagaResposta;
+import com.gupyclone.vagas.VagaResposta;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,10 +27,14 @@ public class PaginaDoRhController {
     static final int LINHAS_DE_CRITERIO = 5;
 
     private final ServicoDeVagas vagas;
+    private final MontadorDeVagaResposta montador;
     private final ServicoDeCandidaturas candidaturas;
 
-    public PaginaDoRhController(ServicoDeVagas vagas, ServicoDeCandidaturas candidaturas) {
+    public PaginaDoRhController(ServicoDeVagas vagas,
+                                MontadorDeVagaResposta montador,
+                                ServicoDeCandidaturas candidaturas) {
         this.vagas = vagas;
+        this.montador = montador;
         this.candidaturas = candidaturas;
     }
 
@@ -39,10 +44,10 @@ public class PaginaDoRhController {
 
     @GetMapping("/rh/vagas")
     public String minhasVagas(@AuthenticationPrincipal UsuarioAutenticado usuario, Model modelo) {
-        List<VagaComCandidaturas> lista = vagas.doRecrutador(usuario.entidadeId()).stream()
+        List<VagaComCandidaturas> lista = montador.completas(vagas.doRecrutador(usuario.entidadeId())).stream()
                 .map(vaga -> new VagaComCandidaturas(
-                        VagaResposta.de(vaga),
-                        candidaturas.daVaga(vaga.getId(), usuario.entidadeId())))
+                        vaga,
+                        candidaturas.daVaga(vaga.id(), usuario.entidadeId())))
                 .toList();
         modelo.addAttribute("vagas", lista);
         return "rh/vagas";

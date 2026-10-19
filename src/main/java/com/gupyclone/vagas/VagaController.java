@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
-import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -70,63 +69,12 @@ public class VagaController {
         }
     }
 
-    /** Vaga como a API a devolve. */
-    public record VagaResposta(Long id,
-                               String titulo,
-                               String descricao,
-                               StatusVaga status,
-                               int pontuacaoMinima,
-                               RecrutadorResposta recrutador,
-                               List<CriterioResposta> criterios,
-                               OffsetDateTime criadoEm) {
-
-        /** Quem publicou a vaga, o suficiente para exibir. */
-        public record RecrutadorResposta(Long id, String nome) {
-        }
-
-        /** Criterio de aceite ja gravado. */
-        public record CriterioResposta(Long id, String descricao, String expressao, int peso, boolean obrigatorio) {
-        }
-
-        /**
-         * Versao para quem nao e o RH dono da vaga: sem a expressao de busca.
-         *
-         * <p>A expressao e o criterio de triagem em forma executavel — inclui
-         * negativas como {@code -php}. Entregar isso ao candidato e dizer
-         * exatamente o que escrever no curriculo para passar, e a interface
-         * nunca a mostrou; era a API que vazava.
-         */
-        public static VagaResposta semExpressoes(Vaga vaga) {
-            VagaResposta completa = de(vaga);
-            return new VagaResposta(completa.id(), completa.titulo(), completa.descricao(),
-                    completa.status(), completa.pontuacaoMinima(), completa.recrutador(),
-                    completa.criterios().stream()
-                            .map(criterio -> new CriterioResposta(criterio.id(), criterio.descricao(),
-                                    null, criterio.peso(), criterio.obrigatorio()))
-                            .toList(),
-                    completa.criadoEm());
-        }
-
-        public static VagaResposta de(Vaga vaga) {
-            return new VagaResposta(
-                    vaga.getId(),
-                    vaga.getTitulo(),
-                    vaga.getDescricao(),
-                    vaga.getStatus(),
-                    vaga.getPontuacaoMinima(),
-                    new RecrutadorResposta(vaga.getRecrutador().getId(), vaga.getRecrutador().getNome()),
-                    vaga.getCriterios().stream()
-                            .map(criterio -> new CriterioResposta(criterio.getId(), criterio.getDescricao(),
-                                    criterio.getExpressao(), criterio.getPeso(), criterio.isObrigatorio()))
-                            .toList(),
-                    vaga.getCriadoEm());
-        }
-    }
-
     private final ServicoDeVagas vagas;
+    private final MontadorDeVagaResposta montador;
 
-    public VagaController(ServicoDeVagas vagas) {
+    public VagaController(ServicoDeVagas vagas, MontadorDeVagaResposta montador) {
         this.vagas = vagas;
+        this.montador = montador;
     }
 
     /**
@@ -140,25 +88,18 @@ public class VagaController {
                                                  @Valid @RequestBody NovaVagaRequisicao requisicao) {
         Vaga vaga = vagas.publicar(usuario.entidadeId(), requisicao.titulo(), requisicao.descricao(),
                 requisicao.pontuacaoMinima(), requisicao.paraOServico());
+        // Resposta completa sem checar dono: quem acabou de publicar e o dono.
         return ResponseEntity.created(URI.create("/api/vagas/" + vaga.getId()))
-                .body(VagaResposta.de(vaga));
+                .body(montador.completa(vaga));
     }
 
     @GetMapping
     public List<VagaResposta> abertas(@AuthenticationPrincipal UsuarioAutenticado usuario) {
-        return vagas.abertas().stream().map(vaga -> paraQuemPergunta(vaga, usuario)).toList();
+        return montador.paraQuemPergunta(vagas.abertas(), usuario);
     }
 
     @GetMapping("/{id}")
     public VagaResposta porId(@PathVariable Long id, @AuthenticationPrincipal UsuarioAutenticado usuario) {
-        return paraQuemPergunta(vagas.porId(id), usuario);
-    }
-
-    /** So o RH dono da vaga ve as expressoes de busca dos criterios. */
-    private static VagaResposta paraQuemPergunta(Vaga vaga, UsuarioAutenticado usuario) {
-        boolean ehODono = usuario != null
-                && usuario.ehRh()
-                && usuario.entidadeId().equals(vaga.getRecrutador().getId());
-        return ehODono ? VagaResposta.de(vaga) : VagaResposta.semExpressoes(vaga);
+        return montador.paraQuemPergunta(vagas.porId(id), usuario);
     }
 }

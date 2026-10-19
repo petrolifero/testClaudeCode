@@ -161,6 +161,33 @@ class VagaControllerTest extends TesteDeIntegracao {
     }
 
     @Test
+    @DisplayName("so o RH dono recebe a expressao de busca dos criterios")
+    void expressaoSoVaiParaORhDono() {
+        // A expressao e o criterio de triagem em forma executavel: entregue ao
+        // candidato, diria o que escrever no curriculo para passar. Com o
+        // recrutador agora guardado por id, e o id que decide quem e o dono.
+        Long vaga = publicar("Pessoa Desenvolvedora Java");
+
+        clienteComo("carlos").get().uri("/api/vagas/" + vaga).exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.recrutador.nome").isEqualTo("Ana Souza")
+                .jsonPath("$.criterios[0].descricao").isEqualTo("Java")
+                .jsonPath("$.criterios[0].expressao").isEmpty();
+
+        clienteComo("carlos").get().uri("/api/vagas").exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].criterios[0].expressao").isEmpty();
+
+        clienteComo("ana").get().uri("/api/vagas/" + vaga).exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.recrutador.nome").isEqualTo("Ana Souza")
+                .jsonPath("$.criterios[0].expressao").isEqualTo("java");
+    }
+
+    @Test
     @DisplayName("vaga inexistente responde 404")
     void vagaInexistenteResponde404() {
         clienteComo("carlos").get().uri("/api/vagas/9999999").exchange()

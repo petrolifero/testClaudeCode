@@ -58,8 +58,10 @@ com.gupyclone
 ├── config/          Propriedades*, JwtConfig, SegurancaConfig
 ├── seguranca/       Papel, UsuarioAutenticado, ServicoDeToken, filtro JWT,
 │                    ServicoDePersonas, entrar/sair (HTML e API)
-├── pessoas/         Candidato, Recrutador + repositórios
-├── vagas/           Vaga, CriterioAceite, StatusVaga + repositórios
+├── pessoas/         Candidato, Recrutador, porta ConsultaDePessoas
+├── vagas/           Vaga (recrutador por id, critérios por objeto),
+│                    CriterioAceite, StatusVaga, porta ConsultaDeVagas,
+│                    MontadorDeVagaResposta
 ├── curriculos/      Curriculo, OrigemTexto, TextoExtraido,
 │                    ExtratorDeTextoDePdf, MotorDeOcr, RecebedorDeCurriculos
 ├── candidaturas/    Candidatura (vaga, candidato, currículo e recrutador por

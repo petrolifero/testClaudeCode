@@ -1,9 +1,7 @@
 package com.gupyclone.vagas;
 
-import com.gupyclone.pessoas.Recrutador;
-import com.gupyclone.pessoas.RecrutadorRepository;
+import com.gupyclone.pessoas.ConsultaDePessoas;
 import java.util.List;
-import org.hibernate.Hibernate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>O dono da vaga e sempre o recrutador autenticado. Nenhum metodo aqui
  * aceita o papel como parametro: quem decide se a acao e permitida e a
  * comparacao com o recrutador que publicou a vaga.
+ *
+ * <p>Um unico repositorio, o do proprio agregado. O recrutador e outro
+ * agregado: entra como id e so e consultado pela porta de pessoas, para recusar
+ * publicacao em nome de quem nao existe. As vagas devolvidas ja vem com os
+ * criterios no mesmo SELECT (ver {@link VagaRepository#COM_CRITERIOS}), por
+ * isso nenhuma delas tem associacao preguicosa sobrando para quem monta a
+ * resposta fora da transacao.
  */
 @Service
 @Transactional
@@ -39,13 +44,13 @@ public class ServicoDeVagas {
 
     private final VagaRepository vagas;
     private final ValidadorDeExpressaoDeBusca validador;
-    private final RecrutadorRepository recrutadores;
+    private final ConsultaDePessoas pessoas;
 
     public ServicoDeVagas(VagaRepository vagas,
-                          RecrutadorRepository recrutadores,
+                          ConsultaDePessoas pessoas,
                           ValidadorDeExpressaoDeBusca validador) {
         this.vagas = vagas;
-        this.recrutadores = recrutadores;
+        this.pessoas = pessoas;
         this.validador = validador;
     }
 
@@ -57,12 +62,16 @@ public class ServicoDeVagas {
         if (recrutadorId == null) {
             throw new IllegalArgumentException("a vaga precisa de um recrutador");
         }
-        Recrutador recrutador = recrutadores.findById(recrutadorId)
-                .orElseThrow(() -> new IllegalArgumentException("recrutador inexistente: " + recrutadorId));
+        // Checagem pela porta, e nao pela chave estrangeira: a violacao de FK
+        // chegaria como DataIntegrityViolationException no flush, sem dizer qual
+        // dos ids da vaga estava errado.
+        if (pessoas.recrutador(recrutadorId).isEmpty()) {
+            throw new IllegalArgumentException("recrutador inexistente: " + recrutadorId);
+        }
 
         Vaga vaga = new Vaga(texto(titulo, MAXIMO_DO_TITULO, "o título da vaga"),
                 exigirPreenchido(descricao, "a descrição da vaga"),
-                recrutador,
+                recrutadorId,
                 pontuacaoMinima);
         if (criterios != null) {
             for (NovoCriterio novo : criterios) {
@@ -80,51 +89,30 @@ public class ServicoDeVagas {
                         novo.obrigatorio()));
             }
         }
-        return carregada(vagas.save(vaga));
+        return vagas.save(vaga);
     }
 
     @Transactional(readOnly = true)
     public List<Vaga> abertas() {
-        return carregadas(vagas.findAllByStatusOrderByCriadoEmDesc(StatusVaga.ABERTA));
+        return vagas.buscarPorStatusComCriterios(StatusVaga.ABERTA);
     }
 
     @Transactional(readOnly = true)
     public Vaga porId(Long id) {
-        return carregada(vagas.buscarComCriterios(id).orElseThrow(() -> new VagaInexistenteException(id)));
+        return vagas.buscarComCriterios(id).orElseThrow(() -> new VagaInexistenteException(id));
     }
 
     @Transactional(readOnly = true)
     public List<Vaga> doRecrutador(Long recrutadorId) {
-        return carregadas(vagas.findAllByRecrutadorIdOrderByCriadoEmDesc(recrutadorId));
+        return vagas.buscarDoRecrutadorComCriterios(recrutadorId);
     }
 
     public void fechar(Long vagaId, Long recrutadorId) {
         Vaga vaga = vagas.findById(vagaId).orElseThrow(() -> new VagaInexistenteException(vagaId));
-        if (!vaga.getRecrutador().getId().equals(recrutadorId)) {
+        if (!vaga.ehDoRecrutador(recrutadorId)) {
             throw new AccessDeniedException("somente quem publicou a vaga pode fechá-la");
         }
         vaga.fechar();
-    }
-
-    /**
-     * Carrega recrutador e criterios antes de a transacao fechar.
-     *
-     * <p>Com {@code open-in-view: false} a vaga chega destacada a quem chamou,
-     * e qualquer associacao preguicosa que sobrasse viraria
-     * {@code LazyInitializationException} na montagem da resposta.
-     */
-    private static Vaga carregada(Vaga vaga) {
-        Hibernate.initialize(vaga.getRecrutador());
-        // getCriterios() devolve uma lista imutavel em volta da colecao
-        // gerenciada, e Hibernate.initialize nao reconheceria esse envelope;
-        // tocar no tamanho inicializa a colecao de verdade.
-        vaga.getCriterios().size();
-        return vaga;
-    }
-
-    private static List<Vaga> carregadas(List<Vaga> encontradas) {
-        encontradas.forEach(ServicoDeVagas::carregada);
-        return encontradas;
     }
 
     private static String texto(String valor, int maximo, String oQue) {

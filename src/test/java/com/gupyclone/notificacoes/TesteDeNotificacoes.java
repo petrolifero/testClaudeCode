@@ -77,7 +77,7 @@ abstract class TesteDeNotificacoes extends TesteDeIntegracao {
     protected Long gravarCandidatura(String chaveDoCandidato, String tituloDaVaga) {
         Candidato candidato = candidatos.findByChave(chaveDoCandidato).orElseThrow();
         Recrutador ana = recrutadores.findByChave("ana").orElseThrow();
-        Vaga vaga = vagas.save(new Vaga(tituloDaVaga, "Descrição de " + tituloDaVaga, ana, 60));
+        Vaga vaga = vagas.save(new Vaga(tituloDaVaga, "Descrição de " + tituloDaVaga, ana.getId(), 60));
         TextoExtraido extraido = new TextoExtraido(
                 "Carreira em Java, Spring Boot e PostgreSQL. Ingles intermediario.",
                 OrigemTexto.CAMADA_DE_TEXTO,
