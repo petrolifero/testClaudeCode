@@ -1,7 +1,5 @@
 package com.gupyclone.notificacoes;
 
-import com.gupyclone.candidaturas.Candidatura;
-
 /**
  * Porta usada pela triagem para avisar o candidato, sem conhecer SMTP nem o
  * texto das mensagens.
@@ -16,5 +14,5 @@ public interface FilaDeEmails {
      * {@code (candidatura, tipo)} nao gera dois e-mails: o banco tem unique
      * nessa combinacao.
      */
-    void enfileirar(Candidatura candidatura, TipoEmail tipo, int pontuacao, String motivo);
+    void enfileirar(AvisoAoCandidato aviso);
 }

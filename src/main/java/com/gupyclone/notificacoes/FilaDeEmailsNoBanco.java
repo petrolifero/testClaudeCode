@@ -1,6 +1,5 @@
 package com.gupyclone.notificacoes;
 
-import com.gupyclone.candidaturas.Candidatura;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -43,18 +42,18 @@ public class FilaDeEmailsNoBanco implements FilaDeEmails {
     // producao.
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public void enfileirar(Candidatura candidatura, TipoEmail tipo, int pontuacao, String motivo) {
-        if (candidatura == null || candidatura.getId() == null) {
+    public void enfileirar(AvisoAoCandidato aviso) {
+        if (aviso == null || aviso.candidaturaId() == null) {
             throw new IllegalArgumentException("so da para avisar sobre candidatura ja gravada");
         }
-        if (emails.findByCandidaturaIdAndTipo(candidatura.getId(), tipo).isPresent()) {
-            log.debug("aviso {} da candidatura {} ja estava na fila", tipo, candidatura.getId());
+        if (emails.findByCandidaturaIdAndTipo(aviso.candidaturaId(), aviso.tipo()).isPresent()) {
+            log.debug("aviso {} da candidatura {} ja estava na fila", aviso.tipo(), aviso.candidaturaId());
             return;
         }
         try {
             // saveAndFlush, e nao save: com save o Hibernate adiaria o insert
             // para o commit, fora deste try, e o catch abaixo nunca veria nada.
-            emails.saveAndFlush(redator.redigir(candidatura, tipo, pontuacao, motivo));
+            emails.saveAndFlush(redator.redigir(aviso));
         } catch (DataIntegrityViolationException colisao) {
             // Rede de seguranca para a janela entre a consulta e o insert. E a
             // consulta acima que faz do segundo enfileiramento um silencio: o
@@ -63,7 +62,7 @@ public class FilaDeEmailsNoBanco implements FilaDeEmails {
             // transacao e inofensivo — a conclusao da candidatura e idempotente
             // e a proxima passada refaz tudo.
             log.debug("aviso {} da candidatura {} foi enfileirado em paralelo",
-                    tipo, candidatura.getId(), colisao);
+                    aviso.tipo(), aviso.candidaturaId(), colisao);
         }
     }
 }

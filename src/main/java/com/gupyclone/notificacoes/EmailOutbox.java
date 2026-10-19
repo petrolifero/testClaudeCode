@@ -1,15 +1,11 @@
 package com.gupyclone.notificacoes;
 
-import com.gupyclone.candidaturas.Candidatura;
 import com.gupyclone.comum.AtrasoDeReentrega;
 import com.gupyclone.comum.EntidadeComId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
@@ -20,14 +16,16 @@ import java.time.OffsetDateTime;
  *
  * <p>O unique {@code (candidatura_id, tipo)} e a garantia de nao duplicar: duas
  * tentativas de enfileirar o mesmo aviso colidem no banco.
+ *
+ * <p>A candidatura e outro agregado e entra aqui por id: o aviso guarda o texto
+ * ja escrito, e nao precisa voltar a ela para ser entregue.
  */
 @Entity
 @Table(name = "email_outbox")
 public class EmailOutbox extends EntidadeComId {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "candidatura_id", nullable = false)
-    private Candidatura candidatura;
+    @Column(name = "candidatura_id", nullable = false, updatable = false)
+    private Long candidaturaId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "tipo", nullable = false, length = 30)
@@ -67,8 +65,11 @@ public class EmailOutbox extends EntidadeComId {
     protected EmailOutbox() {
     }
 
-    public EmailOutbox(Candidatura candidatura, TipoEmail tipo, String destinatario, String assunto, String corpo) {
-        this.candidatura = candidatura;
+    public EmailOutbox(Long candidaturaId, TipoEmail tipo, String destinatario, String assunto, String corpo) {
+        if (candidaturaId == null) {
+            throw new IllegalArgumentException("aviso precisa da candidatura que o originou");
+        }
+        this.candidaturaId = candidaturaId;
         this.tipo = tipo;
         this.destinatario = destinatario;
         this.assunto = assunto;
@@ -120,8 +121,8 @@ public class EmailOutbox extends EntidadeComId {
         }
     }
 
-    public Candidatura getCandidatura() {
-        return candidatura;
+    public Long getCandidaturaId() {
+        return candidaturaId;
     }
 
     public TipoEmail getTipo() {

@@ -1,15 +1,11 @@
 package com.gupyclone.triagem;
 
-import com.gupyclone.candidaturas.Candidatura;
 import com.gupyclone.comum.AtrasoDeReentrega;
 import com.gupyclone.comum.EntidadeComId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
@@ -20,14 +16,17 @@ import java.time.OffsetDateTime;
  * <p>Criado na mesma transacao da candidatura (padrao outbox): nao existe
  * candidatura submetida sem job de analise, e nao existe job duplicado porque
  * {@code candidatura_id} e unique.
+ *
+ * <p>A candidatura e outro agregado e entra aqui por id: o job diz de qual
+ * candidatura ele e, e quem precisa dos dados dela usa a porta
+ * {@code Candidaturas}.
  */
 @Entity
 @Table(name = "analise_job")
 public class AnaliseJob extends EntidadeComId {
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "candidatura_id", nullable = false, unique = true)
-    private Candidatura candidatura;
+    @Column(name = "candidatura_id", nullable = false, updatable = false, unique = true)
+    private Long candidaturaId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -54,8 +53,11 @@ public class AnaliseJob extends EntidadeComId {
     protected AnaliseJob() {
     }
 
-    public AnaliseJob(Candidatura candidatura) {
-        this.candidatura = candidatura;
+    public AnaliseJob(Long candidaturaId) {
+        if (candidaturaId == null) {
+            throw new IllegalArgumentException("job de analise precisa de uma candidatura");
+        }
+        this.candidaturaId = candidaturaId;
         this.status = StatusJob.PENDENTE;
         this.tentativas = 0;
         this.disponivelEm = OffsetDateTime.now();
@@ -122,8 +124,8 @@ public class AnaliseJob extends EntidadeComId {
         }
     }
 
-    public Candidatura getCandidatura() {
-        return candidatura;
+    public Long getCandidaturaId() {
+        return candidaturaId;
     }
 
     public StatusJob getStatus() {

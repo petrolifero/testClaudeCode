@@ -47,10 +47,10 @@ public class CandidaturaController {
             @AuthenticationPrincipal UsuarioAutenticado usuario,
             @PathVariable("id") Long vagaId,
             @RequestPart(name = "arquivo", required = false) MultipartFile arquivo) {
-        Candidatura candidatura = candidaturas.candidatar(
+        CandidaturaResposta candidatura = candidaturas.candidatar(
                 usuario.entidadeId(), vagaId, nomeDe(arquivo), conteudoDe(arquivo));
-        return ResponseEntity.created(URI.create("/api/candidaturas/" + candidatura.getId()))
-                .body(CandidaturaResposta.de(candidatura));
+        return ResponseEntity.created(URI.create("/api/candidaturas/" + candidatura.id()))
+                .body(candidatura);
     }
 
     @GetMapping("/api/candidaturas/minhas")

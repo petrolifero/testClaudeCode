@@ -93,6 +93,6 @@ class LeaseEnvenenadoTest extends TesteDeTriagem {
     private Long jobDeUmaCandidaturaReal() {
         var vaga = publicarVagaDeExemplo(50);
         var candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
-        return analises.findByCandidaturaId(candidatura.getId()).orElseThrow().getId();
+        return analises.findByCandidaturaId(candidatura.id()).orElseThrow().getId();
     }
 }

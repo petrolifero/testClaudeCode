@@ -3,8 +3,11 @@ package com.gupyclone.triagem;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gupyclone.candidaturas.Candidatura;
+import com.gupyclone.candidaturas.CandidaturaResposta;
+import com.gupyclone.candidaturas.Candidaturas;
 import com.gupyclone.candidaturas.StatusCandidatura;
 import com.gupyclone.curriculos.OrigemTexto;
+import com.gupyclone.notificacoes.AvisoAoCandidato;
 import com.gupyclone.notificacoes.EmailOutbox;
 import com.gupyclone.notificacoes.FilaDeEmails;
 import com.gupyclone.notificacoes.TipoEmail;
@@ -54,6 +57,9 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
     private FilaDeEmails fila;
 
     @Autowired
+    private Candidaturas candidaturasPorId;
+
+    @Autowired
     private TransactionTemplate transacao;
 
     @Test
@@ -75,27 +81,28 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
     @DisplayName("fim a fim aprovada: candidatura APROVADA, job CONCLUIDO e um unico e-mail de aprovacao")
     void fimAFimAprovada() {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
 
         assertThat(processador.processarUmLote()).isEqualTo(1);
 
-        Candidatura analisada = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura analisada = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(analisada.getStatus()).isEqualTo(StatusCandidatura.APROVADA);
         assertThat(analisada.getPontuacao()).isEqualTo(100);
         assertThat(analisada.getAnalisadaEm()).isNotNull();
         assertThat(analisada.getMotivo()).contains("Java");
 
-        AnaliseJob job = analises.findByCandidaturaId(candidatura.getId()).orElseThrow();
+        AnaliseJob job = analises.findByCandidaturaId(candidatura.id()).orElseThrow();
         assertThat(job.getStatus()).isEqualTo(StatusJob.CONCLUIDO);
         assertThat(job.getReivindicadoEm()).isNull();
         assertThat(job.getUltimoErro()).isNull();
 
         assertThat(emails.count()).isEqualTo(1);
-        EmailOutbox aviso = emails.findAllByCandidaturaId(candidatura.getId()).getFirst();
+        EmailOutbox aviso = emails.findAllByCandidaturaId(candidatura.id()).getFirst();
         assertThat(aviso.getTipo()).isEqualTo(TipoEmail.CANDIDATURA_APROVADA);
         assertThat(aviso.getDestinatario()).isEqualTo("carlos.pereira@exemplo.com.br");
-        // O e-mail sai da transacao que concluiu a candidatura, com a entidade
-        // gerenciada: se viesse destacada, o redator nem teria lido o nome.
+        // O e-mail sai da transacao que concluiu a candidatura, com nome, vaga
+        // e pontuacao que o processador leu antes de analisar: o redator nao
+        // volta ao banco, entao e aqui que se ve se o aviso chegou completo.
         assertThat(aviso.getCorpo()).contains("Carlos Pereira").contains(TITULO_DA_VAGA).contains("100");
     }
 
@@ -103,18 +110,18 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
     @DisplayName("fim a fim reprovada: motivo explica o que faltou e sai um unico e-mail de reprovacao")
     void fimAFimReprovada() {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_NAO_ATENDE);
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_NAO_ATENDE);
 
         assertThat(processador.processarUmLote()).isEqualTo(1);
 
-        Candidatura analisada = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura analisada = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(analisada.getStatus()).isEqualTo(StatusCandidatura.REPROVADA);
         assertThat(analisada.getPontuacao()).isZero();
         assertThat(analisada.getAnalisadaEm()).isNotNull();
         assertThat(analisada.getMotivo()).contains("não atendidos").contains("Java");
 
         assertThat(emails.count()).isEqualTo(1);
-        EmailOutbox aviso = emails.findAllByCandidaturaId(candidatura.getId()).getFirst();
+        EmailOutbox aviso = emails.findAllByCandidaturaId(candidatura.id()).getFirst();
         assertThat(aviso.getTipo()).isEqualTo(TipoEmail.CANDIDATURA_REPROVADA);
         assertThat(aviso.getCorpo()).contains("não atendidos").contains("Java");
     }
@@ -125,18 +132,18 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
         Vaga vaga = publicarVaga("Pessoa de Dados", 50,
                 new NovoCriterio("Python", "python", 90, false),
                 new NovoCriterio("Certificação AWS", "aws", 10, true));
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), FabricaDePdf.comCamadaDeTexto(
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), FabricaDePdf.comCamadaDeTexto(
                 "Carlos Pereira",
                 "Engenheiro de dados com Python, Pandas e Airflow",
                 "Experiencia com data warehouse on premise"));
 
         assertThat(processador.processarUmLote()).isEqualTo(1);
 
-        Candidatura analisada = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura analisada = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(analisada.getPontuacao()).isEqualTo(90);
         assertThat(analisada.getStatus()).isEqualTo(StatusCandidatura.REPROVADA);
         assertThat(analisada.getMotivo()).contains("Certificação AWS").contains("obrigatório");
-        assertThat(emails.findAllByCandidaturaId(candidatura.getId()).getFirst().getTipo())
+        assertThat(emails.findAllByCandidaturaId(candidatura.id()).getFirst().getTipo())
                 .isEqualTo(TipoEmail.CANDIDATURA_REPROVADA);
     }
 
@@ -144,15 +151,15 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
     @DisplayName("vaga sem criterio nenhum aprova e avisa o candidato")
     void vagaSemCriterioAprova() {
         Vaga vaga = publicarVaga("Pessoa Generalista", 0);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_NAO_ATENDE);
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_NAO_ATENDE);
 
         assertThat(processador.processarUmLote()).isEqualTo(1);
 
-        Candidatura analisada = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura analisada = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(analisada.getStatus()).isEqualTo(StatusCandidatura.APROVADA);
         assertThat(analisada.getPontuacao()).isEqualTo(100);
         assertThat(analisada.getMotivo()).contains("não definiu critérios");
-        assertThat(emails.findAllByCandidaturaId(candidatura.getId()).getFirst().getTipo())
+        assertThat(emails.findAllByCandidaturaId(candidatura.id()).getFirst().getTipo())
                 .isEqualTo(TipoEmail.CANDIDATURA_APROVADA);
     }
 
@@ -162,34 +169,34 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
         Vaga vaga = publicarVaga("Pessoa Desenvolvedora Java", 40,
                 new NovoCriterio("Java", "java", 60, true),
                 new NovoCriterio("Spring", "spring", 40, false));
-        Candidatura candidatura = candidatar(joao, vaga.getId(), FabricaDePdf.somenteImagem(
+        CandidaturaResposta candidatura = candidatar(joao, vaga.getId(), FabricaDePdf.somenteImagem(
                 "Joao Lima",
                 "Desenvolvedor Java com Spring Boot",
                 "Experiencia com PostgreSQL"));
 
-        // A candidatura devolvida pelo servico ja vem com o curriculo carregado.
-        assertThat(candidatura.getCurriculo().getOrigemTexto()).isEqualTo(OrigemTexto.OCR);
+        // A candidatura devolvida pelo servico ja diz de onde veio o texto.
+        assertThat(candidatura.origemDoTexto()).isEqualTo(OrigemTexto.OCR);
 
         assertThat(processador.processarUmLote()).isEqualTo(1);
 
-        Candidatura analisada = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura analisada = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(analisada.getStatus()).isEqualTo(StatusCandidatura.APROVADA);
         assertThat(analisada.getPontuacao()).isGreaterThanOrEqualTo(60);
-        assertThat(emails.countByCandidaturaId(candidatura.getId())).isEqualTo(1);
+        assertThat(emails.countByCandidaturaId(candidatura.id())).isEqualTo(1);
     }
 
     @Test
     @DisplayName("processar duas vezes nao muda nada e nao manda um segundo e-mail")
     void processarDuasVezesNaoDuplica() {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
 
         assertThat(processador.processarUmLote()).isEqualTo(1);
-        OffsetDateTime primeiraAnalise = candidaturas.findById(candidatura.getId()).orElseThrow().getAnalisadaEm();
+        OffsetDateTime primeiraAnalise = candidaturas.findById(candidatura.id()).orElseThrow().getAnalisadaEm();
 
         assertThat(processador.processarUmLote()).as("o job concluido nao e reivindicado de novo").isZero();
 
-        Candidatura depois = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura depois = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(depois.getStatus()).isEqualTo(StatusCandidatura.APROVADA);
         assertThat(depois.getAnalisadaEm()).isEqualTo(primeiraAnalise);
         assertThat(emails.count()).isEqualTo(1);
@@ -200,7 +207,7 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
     @DisplayName("candidatura ja concluida: o job fecha sem reescrever nada e sem segundo e-mail")
     void candidaturaJaConcluidaNaoRecebeSegundoEmail() {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
         // O estado que um worker morto entre as duas escritas deixaria: a
         // candidatura decidida e o job ainda na fila.
         jdbc.sql("""
@@ -210,16 +217,16 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
                        motivo = 'decidida numa passada anterior',
                        analisada_em = now()
                  where id = ?
-                """).param(candidatura.getId()).update();
+                """).param(candidatura.id()).update();
 
         assertThat(processador.processarUmLote()).isZero();
 
-        Candidatura intocada = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura intocada = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(intocada.getStatus()).isEqualTo(StatusCandidatura.REPROVADA);
         assertThat(intocada.getPontuacao()).isEqualTo(11);
         assertThat(intocada.getMotivo()).isEqualTo("decidida numa passada anterior");
         assertThat(emails.count()).as("o e-mail da passada anterior nao e refeito").isZero();
-        assertThat(analises.findByCandidaturaId(candidatura.getId()).orElseThrow().getStatus())
+        assertThat(analises.findByCandidaturaId(candidatura.id()).orElseThrow().getStatus())
                 .isEqualTo(StatusJob.CONCLUIDO);
     }
 
@@ -227,8 +234,8 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
     @DisplayName("lease expirado volta para PENDENTE e o job e concluido na passada seguinte")
     void leaseExpiradoNaoPerdeACandidatura() {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
-        Long jobId = analises.findByCandidaturaId(candidatura.getId()).orElseThrow().getId();
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        Long jobId = analises.findByCandidaturaId(candidatura.id()).orElseThrow().getId();
 
         // O estado que um worker morto deixaria: reivindicado e nunca concluido.
         jdbc.sql("""
@@ -240,7 +247,7 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
                 """).param(jobId).update();
 
         assertThat(processador.processarUmLote()).as("PROCESSANDO nao e reivindicado").isZero();
-        assertThat(candidaturas.findById(candidatura.getId()).orElseThrow().getStatus())
+        assertThat(candidaturas.findById(candidatura.id()).orElseThrow().getStatus())
                 .isEqualTo(StatusCandidatura.RECEBIDA);
 
         assertThat(processador.recuperarLeasesExpirados()).isEqualTo(1);
@@ -250,18 +257,18 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
         assertThat(devolvido.getReivindicadoEm()).isNull();
 
         assertThat(processador.processarUmLote()).isEqualTo(1);
-        assertThat(candidaturas.findById(candidatura.getId()).orElseThrow().getStatus())
+        assertThat(candidaturas.findById(candidatura.id()).orElseThrow().getStatus())
                 .isEqualTo(StatusCandidatura.APROVADA);
         assertThat(analises.findById(jobId).orElseThrow().getStatus()).isEqualTo(StatusJob.CONCLUIDO);
-        assertThat(emails.countByCandidaturaId(candidatura.getId())).isEqualTo(1);
+        assertThat(emails.countByCandidaturaId(candidatura.id())).isEqualTo(1);
     }
 
     @Test
     @DisplayName("lease ainda valido nao e recuperado")
     void leaseValidoNaoEDevolvido() {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
-        Long jobId = analises.findByCandidaturaId(candidatura.getId()).orElseThrow().getId();
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        Long jobId = analises.findByCandidaturaId(candidatura.id()).orElseThrow().getId();
         jdbc.sql("update analise_job set status = 'PROCESSANDO', reivindicado_em = now() where id = ?")
                 .param(jobId).update();
 
@@ -273,7 +280,7 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
     @DisplayName("perder a corrida da conclusao nao reescreve o veredito nem manda segundo e-mail")
     void perderACorridaDaConclusaoNaoDuplica() throws Exception {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
         ExecutorService piscina = Executors.newSingleThreadExecutor();
         try {
             Future<Integer> emParalelo = transacao.execute(status -> {
@@ -281,7 +288,7 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
                 // comito: a linha fica travada, e quem le enxerga a versao
                 // antiga (RECEBIDA). O processador vai ate o fim da analise e
                 // so entao descobre a corrida.
-                assertThat(concluirComoRival(candidatura.getId())).isEqualTo(1);
+                assertThat(concluirComoRival(candidatura.id())).isTrue();
 
                 Future<Integer> tentativa = piscina.submit(processador::processarUmLote);
                 Awaitility.await().atMost(Duration.ofSeconds(PACIENCIA_EM_SEGUNDOS))
@@ -297,14 +304,14 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
             piscina.shutdownNow();
         }
 
-        Candidatura doRival = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura doRival = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(doRival.getStatus()).isEqualTo(StatusCandidatura.REPROVADA);
         assertThat(doRival.getPontuacao()).isEqualTo(7);
         assertThat(doRival.getMotivo()).isEqualTo("decidida pelo worker rival");
         assertThat(emails.count()).isEqualTo(1);
-        assertThat(emails.findAllByCandidaturaId(candidatura.getId()).getFirst().getTipo())
+        assertThat(emails.findAllByCandidaturaId(candidatura.id()).getFirst().getTipo())
                 .isEqualTo(TipoEmail.CANDIDATURA_REPROVADA);
-        assertThat(analises.findByCandidaturaId(candidatura.getId()).orElseThrow().getStatus())
+        assertThat(analises.findByCandidaturaId(candidatura.id()).orElseThrow().getStatus())
                 .isEqualTo(StatusJob.CONCLUIDO);
     }
 
@@ -320,7 +327,7 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
             // Metade atende e metade nao: os dois caminhos de decisao, e os
             // dois tipos de e-mail, acontecem ao mesmo tempo.
             byte[] pdf = numero % 2 == 0 ? PDF_QUE_ATENDE : PDF_QUE_NAO_ATENDE;
-            candidaturaIds.add(candidatar(candidato, vaga.getId(), pdf).getId());
+            candidaturaIds.add(candidatar(candidato, vaga.getId(), pdf).id());
         }
         assertThat(analises.countByStatus(StatusJob.PENDENTE)).isEqualTo(quantidade);
 
@@ -377,12 +384,13 @@ class ProcessadorDeAnalisesTest extends TesteDeTriagem {
     }
 
     /** Conclui e avisa como o processador faz, para a corrida ser a de verdade. */
-    private int concluirComoRival(Long candidaturaId) {
-        int linhas = candidaturas.concluir(candidaturaId, StatusCandidatura.REPROVADA, 7,
-                "decidida pelo worker rival", OffsetDateTime.now());
-        Candidatura gerenciada = candidaturas.findById(candidaturaId).orElseThrow();
-        fila.enfileirar(gerenciada, TipoEmail.CANDIDATURA_REPROVADA, 7, "decidida pelo worker rival");
-        return linhas;
+    private boolean concluirComoRival(Long candidaturaId) {
+        boolean concluida = candidaturasPorId.concluir(candidaturaId, StatusCandidatura.REPROVADA, 7,
+                "decidida pelo worker rival");
+        fila.enfileirar(new AvisoAoCandidato(candidaturaId, TipoEmail.CANDIDATURA_REPROVADA,
+                "carlos.pereira@exemplo.com.br", "Carlos Pereira", TITULO_DA_VAGA, 7,
+                "decidida pelo worker rival"));
+        return concluida;
     }
 
     /**

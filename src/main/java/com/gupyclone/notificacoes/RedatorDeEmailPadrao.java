@@ -1,13 +1,13 @@
 package com.gupyclone.notificacoes;
 
-import com.gupyclone.candidaturas.Candidatura;
 import org.springframework.stereotype.Component;
 
 /**
  * Texto padrao dos avisos ao candidato.
  *
- * <p>Precisa ser chamado com a candidatura gerenciada, dentro da transacao que
- * a concluiu: le o candidato e a vaga, que sao associacoes preguicosas.
+ * <p>Trabalha so com o que o aviso traz: nome, vaga, pontuacao e motivo chegam
+ * prontos de quem decidiu a candidatura, e aqui nao ha nada para ir buscar no
+ * banco.
  */
 @Component
 public class RedatorDeEmailPadrao implements RedatorDeEmail {
@@ -25,26 +25,26 @@ public class RedatorDeEmailPadrao implements RedatorDeEmail {
             "a análise do seu currículo não alcançou a pontuação mínima definida para a vaga.";
 
     @Override
-    public EmailOutbox redigir(Candidatura candidatura, TipoEmail tipo, int pontuacao, String motivo) {
-        if (candidatura == null) {
-            throw new IllegalArgumentException("sem candidatura nao ha o que avisar");
+    public EmailOutbox redigir(AvisoAoCandidato aviso) {
+        if (aviso == null) {
+            throw new IllegalArgumentException("sem aviso nao ha o que redigir");
         }
-        if (tipo == null) {
+        if (aviso.tipo() == null) {
             throw new IllegalArgumentException("o aviso precisa de um tipo");
         }
-        String nome = candidatura.getCandidato().getNome();
-        String vaga = candidatura.getVaga().getTitulo();
-        return switch (tipo) {
-            case CANDIDATURA_APROVADA -> new EmailOutbox(candidatura,
-                    tipo,
-                    candidatura.getCandidato().getEmail(),
+        String nome = aviso.nomeDoCandidato();
+        String vaga = aviso.tituloDaVaga();
+        return switch (aviso.tipo()) {
+            case CANDIDATURA_APROVADA -> new EmailOutbox(aviso.candidaturaId(),
+                    aviso.tipo(),
+                    aviso.destinatario(),
                     "Sua candidatura avançou: " + vaga,
-                    aprovada(nome, vaga, pontuacao));
-            case CANDIDATURA_REPROVADA -> new EmailOutbox(candidatura,
-                    tipo,
-                    candidatura.getCandidato().getEmail(),
+                    aprovada(nome, vaga, aviso.pontuacao()));
+            case CANDIDATURA_REPROVADA -> new EmailOutbox(aviso.candidaturaId(),
+                    aviso.tipo(),
+                    aviso.destinatario(),
                     "Sobre sua candidatura: " + vaga,
-                    reprovada(nome, vaga, pontuacao, motivo));
+                    reprovada(nome, vaga, aviso.pontuacao(), aviso.motivo()));
         };
     }
 

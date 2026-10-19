@@ -9,7 +9,6 @@ import com.gupyclone.curriculos.OrigemTexto;
 import com.gupyclone.curriculos.RecebedorDeCurriculos;
 import com.gupyclone.triagem.StatusJob;
 import com.gupyclone.vagas.VagaInexistenteException;
-import com.gupyclone.vagas.VagaRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -43,22 +42,29 @@ class ServicoDeCandidaturasTest extends TesteDeCandidaturas {
     private RecebedorDeCurriculos recebedor;
 
     @Autowired
-    private VagaRepository vagas;
-
-    @Autowired
     private TransactionTemplate transacao;
 
     @Test
-    @DisplayName("a candidatura chega com vaga, candidato e curriculo legiveis fora da transacao")
-    void candidaturaChegaComAssociacoesCarregadas() {
-        Candidatura nova = servico.candidatar(carlos, vaga, "carlos.pdf", PDF_COM_TEXTO);
+    @DisplayName("a candidatura chega com vaga, candidato e origem do texto legiveis fora da transacao")
+    void candidaturaChegaLegivelForaDaTransacao() {
+        CandidaturaResposta nova = servico.candidatar(carlos, vaga, "carlos.pdf", PDF_COM_TEXTO);
 
-        // Sem transacao em volta do teste e com open-in-view falso: ler estas
-        // associacoes so funciona se o servico as carregou antes de devolver.
-        assertThat(nova.getVaga().getTitulo()).isEqualTo(TITULO_DA_VAGA);
-        assertThat(nova.getCandidato().getNome()).isEqualTo("Carlos Pereira");
-        assertThat(nova.getCurriculo().getOrigemTexto()).isEqualTo(OrigemTexto.CAMADA_DE_TEXTO);
-        assertThat(nova.getStatus()).isEqualTo(StatusCandidatura.RECEBIDA);
+        // Sem transacao em volta do teste e com open-in-view falso: a resposta
+        // vem por projecao, entao nao sobra associacao preguicosa para estourar
+        // depois que a transacao do servico fechou.
+        assertThat(nova.tituloDaVaga()).isEqualTo(TITULO_DA_VAGA);
+        assertThat(nova.nomeDoCandidato()).isEqualTo("Carlos Pereira");
+        assertThat(nova.origemDoTexto()).isEqualTo(OrigemTexto.CAMADA_DE_TEXTO);
+        assertThat(nova.status()).isEqualTo(StatusCandidatura.RECEBIDA);
+
+        // Os quatro ids que a candidatura passa a guardar, em vez das quatro
+        // associacoes: o recrutador e o dono da vaga, nao um quinto parametro.
+        Candidatura gravada = candidaturas.findById(nova.id()).orElseThrow();
+        assertThat(gravada.getVagaId()).isEqualTo(vaga);
+        assertThat(gravada.getCandidatoId()).isEqualTo(carlos);
+        assertThat(gravada.getCurriculoId())
+                .isEqualTo(curriculos.findAllByCandidatoIdOrderByCriadoEmDesc(carlos).getFirst().getId());
+        assertThat(gravada.getRecrutadorId()).isEqualTo(ana);
 
         // As LISTAGENS vem por projecao, nao como entidade: nao ha associacao
         // preguicosa para resolver e, principalmente, o PDF em bytea e o texto
@@ -160,16 +166,13 @@ class ServicoDeCandidaturasTest extends TesteDeCandidaturas {
         Curriculo doRival = recebedor.receber(carlos, "rival.pdf", PDF_COM_TEXTO);
         ExecutorService piscina = Executors.newSingleThreadExecutor();
         try {
-            Future<Candidatura> emParalelo = transacao.execute(status -> {
+            Future<CandidaturaResposta> emParalelo = transacao.execute(status -> {
                 // Grava a candidatura rival e NAO comita: enquanto esta
                 // transacao estiver aberta a linha e invisivel, portanto a
                 // checagem rapida do servico nao tem como enxerga-la.
-                candidaturas.saveAndFlush(new Candidatura(
-                        vagas.findById(vaga).orElseThrow(),
-                        candidatos.findById(carlos).orElseThrow(),
-                        curriculos.findById(doRival.getId()).orElseThrow()));
+                candidaturas.saveAndFlush(new Candidatura(vaga, carlos, doRival.getId(), ana));
 
-                Future<Candidatura> tentativa = piscina.submit(
+                Future<CandidaturaResposta> tentativa = piscina.submit(
                         () -> servico.candidatar(carlos, vaga, "carlos.pdf", PDF_COM_TEXTO));
 
                 // O segundo curriculo aparecer significa que o servico ja
@@ -199,7 +202,7 @@ class ServicoDeCandidaturasTest extends TesteDeCandidaturas {
     void dezPedidosSimultaneosDoMesmoCandidato() {
         Resultado resultado = emParalelo(10, pedido -> servico
                 .candidatar(carlos, vaga, "carlos-" + pedido + ".pdf", PDF_COM_TEXTO)
-                .getId());
+                .id());
 
         assertThat(resultado.aceitas()).hasSize(1);
         // Nenhuma excecao de banco vazando: a corrida inteira chega a quem
@@ -224,7 +227,7 @@ class ServicoDeCandidaturasTest extends TesteDeCandidaturas {
 
         Resultado resultado = emParalelo(concorrentes.size(), pedido -> servico
                 .candidatar(concorrentes.get(pedido), vaga, "concorrente-" + pedido + ".pdf", PDF_COM_TEXTO)
-                .getId());
+                .id());
 
         assertThat(resultado.recusas()).isEmpty();
         assertThat(resultado.aceitas()).hasSize(10).doesNotHaveDuplicates();

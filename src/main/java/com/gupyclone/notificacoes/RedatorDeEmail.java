@@ -1,7 +1,5 @@
 package com.gupyclone.notificacoes;
 
-import com.gupyclone.candidaturas.Candidatura;
-
 /**
  * Escreve assunto e corpo do aviso ao candidato.
  *
@@ -10,5 +8,5 @@ import com.gupyclone.candidaturas.Candidatura;
  */
 public interface RedatorDeEmail {
 
-    EmailOutbox redigir(Candidatura candidatura, TipoEmail tipo, int pontuacao, String motivo);
+    EmailOutbox redigir(AvisoAoCandidato aviso);
 }

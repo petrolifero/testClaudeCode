@@ -6,17 +6,12 @@ import java.time.OffsetDateTime;
 /**
  * Uma candidatura como a API e as paginas a mostram.
  *
- * <p>Fica no pacote de dominio, e nao dentro do controlador, porque existem
- * duas formas de obte-la e as duas sao legitimas: de uma entidade ja carregada
- * ({@link #de}) ou direto do banco por projecao
- * ({@link CandidaturaRepository#resumosDoCandidato}).
+ * <p>Fica no pacote de dominio, e nao dentro do controlador, porque as tres
+ * consultas que a produzem sao do agregado (ver {@link CandidaturaRepository}).
  *
- * <p>A projecao existe por um motivo medido: {@code Curriculo} guarda o PDF em
- * {@code bytea} e o texto extraido, e {@code byte[]} nao e preguicoso sem
- * enhancement de bytecode. Inicializar a associacao para ler um unico enum
- * trazia o PDF inteiro e centenas de milhares de caracteres para a memoria, em
- * TODA listagem — com dezenas de candidaturas isso e dezenas de PDFs em heap
- * de uma vez.
+ * <p>Vem sempre de projecao, nunca de uma {@code Candidatura} em mao: titulo da
+ * vaga, nome do candidato e origem do texto pertencem a outros agregados, e a
+ * candidatura so guarda os ids deles.
  */
 public record CandidaturaResposta(Long id,
                                   Long vagaId,
@@ -29,19 +24,4 @@ public record CandidaturaResposta(Long id,
                                   OrigemTexto origemDoTexto,
                                   OffsetDateTime criadoEm,
                                   OffsetDateTime analisadaEm) {
-
-    public static CandidaturaResposta de(Candidatura candidatura) {
-        return new CandidaturaResposta(
-                candidatura.getId(),
-                candidatura.getVaga().getId(),
-                candidatura.getVaga().getTitulo(),
-                candidatura.getCandidato().getId(),
-                candidatura.getCandidato().getNome(),
-                candidatura.getStatus(),
-                candidatura.getPontuacao(),
-                candidatura.getMotivo(),
-                candidatura.getCurriculo().getOrigemTexto(),
-                candidatura.getCriadoEm(),
-                candidatura.getAnalisadaEm());
-    }
 }

@@ -2,6 +2,7 @@ package com.gupyclone.triagem;
 
 import com.gupyclone.candidaturas.Candidatura;
 import com.gupyclone.candidaturas.CandidaturaRepository;
+import com.gupyclone.candidaturas.CandidaturaResposta;
 import com.gupyclone.candidaturas.ServicoDeCandidaturas;
 import com.gupyclone.curriculos.Curriculo;
 import com.gupyclone.curriculos.CurriculoRepository;
@@ -24,9 +25,9 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * reais.
  *
  * <p>Nenhum contexto de analise e inventado: {@link #contextoDe} monta o
- * contexto a partir de uma candidatura que existe no banco, exatamente como o
- * processador o monta em producao. Assim um teste de analisador nao pode passar
- * com dados que o resto do sistema nunca produziria.
+ * contexto a partir de uma candidatura que existe no banco, pelos ids que ela
+ * guarda, como o processador o monta em producao. Assim um teste de analisador
+ * nao pode passar com dados que o resto do sistema nunca produziria.
  *
  * <p>Pessoas extras nascem com {@code findByChave(...).orElseGet(...)}: o
  * limpador devolve {@code candidato} e {@code recrutador} ao estado da migracao
@@ -100,7 +101,7 @@ abstract class TesteDeTriagem extends TesteDeIntegracao {
                 new ServicoDeVagas.NovoCriterio("Inglês", "ingles", 20, false));
     }
 
-    protected Candidatura candidatar(Long candidatoId, Long vagaId, byte[] pdf) {
+    protected CandidaturaResposta candidatar(Long candidatoId, Long vagaId, byte[] pdf) {
         return servicoDeCandidaturas.candidatar(candidatoId, vagaId, "curriculo-" + candidatoId + ".pdf", pdf);
     }
 
@@ -108,9 +109,10 @@ abstract class TesteDeTriagem extends TesteDeIntegracao {
      * Monta o contexto de uma candidatura que existe, com os criterios da vaga
      * e o texto que a extracao de PDF gravou.
      */
-    protected ContextoDaAnalise contextoDe(Candidatura candidatura) {
-        Vaga vaga = servicoDeVagas.porId(candidatura.getVaga().getId());
-        Curriculo curriculo = curriculos.findById(candidatura.getCurriculo().getId()).orElseThrow();
+    protected ContextoDaAnalise contextoDe(Long candidaturaId) {
+        Candidatura candidatura = candidaturas.findById(candidaturaId).orElseThrow();
+        Vaga vaga = servicoDeVagas.porId(candidatura.getVagaId());
+        Curriculo curriculo = curriculos.findById(candidatura.getCurriculoId()).orElseThrow();
         List<ContextoDaAnalise.Criterio> criterios = vaga.getCriterios().stream()
                 .map(criterio -> new ContextoDaAnalise.Criterio(criterio.getId(),
                         criterio.getDescricao(),

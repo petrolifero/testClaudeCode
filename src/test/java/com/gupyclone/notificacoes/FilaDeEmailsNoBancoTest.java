@@ -3,7 +3,6 @@ package com.gupyclone.notificacoes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.gupyclone.candidaturas.Candidatura;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.IllegalTransactionStateException;
@@ -18,9 +17,9 @@ class FilaDeEmailsNoBancoTest extends TesteDeNotificacoes {
     @DisplayName("enfileirar exige a transacao de quem concluiu a candidatura")
     void semTransacaoNaoEnfileira() {
         Long candidaturaId = gravarCandidatura("carlos", "Pessoa Desenvolvedora Java");
-        Candidatura candidatura = candidaturas.findById(candidaturaId).orElseThrow();
+        AvisoAoCandidato aviso = avisoDe(candidaturaId, TipoEmail.CANDIDATURA_APROVADA, 90, null);
 
-        assertThatThrownBy(() -> fila.enfileirar(candidatura, TipoEmail.CANDIDATURA_APROVADA, 90, null))
+        assertThatThrownBy(() -> fila.enfileirar(aviso))
                 .isInstanceOf(IllegalTransactionStateException.class);
 
         assertThat(emails.count()).isZero();
@@ -30,10 +29,10 @@ class FilaDeEmailsNoBancoTest extends TesteDeNotificacoes {
     @DisplayName("se a transacao que enfileirou falhar, o aviso nao fica no banco")
     void avisoNaoSobreviveAoRollback() {
         Long candidaturaId = gravarCandidatura("carlos", "Pessoa Desenvolvedora Java");
+        AvisoAoCandidato aviso = avisoDe(candidaturaId, TipoEmail.CANDIDATURA_APROVADA, 90, null);
 
         assertThatThrownBy(() -> transacao.executeWithoutResult(status -> {
-            Candidatura candidatura = candidaturas.findById(candidaturaId).orElseThrow();
-            fila.enfileirar(candidatura, TipoEmail.CANDIDATURA_APROVADA, 90, null);
+            fila.enfileirar(aviso);
             throw new IllegalStateException("a conclusao da candidatura falhou depois de enfileirar");
         })).isInstanceOf(IllegalStateException.class);
 
@@ -68,8 +67,11 @@ class FilaDeEmailsNoBancoTest extends TesteDeNotificacoes {
     @Test
     @DisplayName("candidatura nao gravada nao entra na fila")
     void candidaturaSemIdNaoEntra() {
+        AvisoAoCandidato semCandidatura = new AvisoAoCandidato(null, TipoEmail.CANDIDATURA_APROVADA,
+                "carlos.pereira@exemplo.com.br", "Carlos Pereira", "Pessoa Desenvolvedora Java", 90, null);
+
         assertThatThrownBy(() -> transacao.executeWithoutResult(status ->
-                fila.enfileirar(null, TipoEmail.CANDIDATURA_APROVADA, 90, null)))
+                fila.enfileirar(semCandidatura)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

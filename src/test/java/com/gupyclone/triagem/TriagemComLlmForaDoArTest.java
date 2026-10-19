@@ -3,6 +3,7 @@ package com.gupyclone.triagem;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gupyclone.candidaturas.Candidatura;
+import com.gupyclone.candidaturas.CandidaturaResposta;
 import com.gupyclone.candidaturas.StatusCandidatura;
 import com.gupyclone.vagas.Vaga;
 import org.junit.jupiter.api.DisplayName;
@@ -52,8 +53,8 @@ class TriagemComLlmForaDoArTest extends TesteDeTriagem {
     @DisplayName("analise que falha devolve o job, mantem a candidatura RECEBIDA e nao manda e-mail")
     void falhaDeAnaliseDevolveOJobSemAprovarNada() {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
-        Long jobId = analises.findByCandidaturaId(candidatura.getId()).orElseThrow().getId();
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        Long jobId = analises.findByCandidaturaId(candidatura.id()).orElseThrow().getId();
 
         assertThat(processador.processarUmLote()).as("nada foi concluido").isZero();
 
@@ -63,7 +64,7 @@ class TriagemComLlmForaDoArTest extends TesteDeTriagem {
         assertThat(depoisDaFalha.getUltimoErro()).contains("AnaliseIndisponivel").contains("127.0.0.1:1");
         assertThat(depoisDaFalha.getReivindicadoEm()).isNull();
 
-        Candidatura intocada = candidaturas.findById(candidatura.getId()).orElseThrow();
+        Candidatura intocada = candidaturas.findById(candidatura.id()).orElseThrow();
         assertThat(intocada.getStatus()).isEqualTo(StatusCandidatura.RECEBIDA);
         assertThat(intocada.getPontuacao()).isNull();
         assertThat(intocada.getMotivo()).isNull();
@@ -94,8 +95,8 @@ class TriagemComLlmForaDoArTest extends TesteDeTriagem {
     @DisplayName("passada a quarentena o job FALHO volta para a fila: FALHO nao e terminal")
     void quarentenaDevolveOJobQueFalhou() {
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
-        Long jobId = analises.findByCandidaturaId(candidatura.getId()).orElseThrow().getId();
+        CandidaturaResposta candidatura = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        Long jobId = analises.findByCandidaturaId(candidatura.id()).orElseThrow().getId();
 
         // Esgota as tentativas contra a LLM fora do ar.
         for (int tentativa = 0; tentativa < 3; tentativa++) {

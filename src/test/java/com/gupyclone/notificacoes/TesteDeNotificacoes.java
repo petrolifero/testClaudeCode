@@ -84,18 +84,29 @@ abstract class TesteDeNotificacoes extends TesteDeIntegracao {
                 1);
         Curriculo curriculo = curriculos.save(
                 new Curriculo(candidato, "curriculo-" + chaveDoCandidato + ".pdf", PDF, extraido));
-        return candidaturas.save(new Candidatura(vaga, candidato, curriculo)).getId();
+        return candidaturas.save(new Candidatura(
+                vaga.getId(), candidato.getId(), curriculo.getId(), ana.getId())).getId();
     }
 
     /**
-     * Enfileira como a triagem vai enfileirar: dentro de uma transacao e com a
-     * candidatura gerenciada, que e o que a fila exige.
+     * Enfileira como a triagem vai enfileirar: dentro de uma transacao e com o
+     * aviso ja montado, que e tudo o que a fila conhece.
      */
     protected void enfileirar(Long candidaturaId, TipoEmail tipo, int pontuacao, String motivo) {
-        transacao.executeWithoutResult(status -> {
-            Candidatura candidatura = candidaturas.findById(candidaturaId).orElseThrow();
-            fila.enfileirar(candidatura, tipo, pontuacao, motivo);
-        });
+        AvisoAoCandidato aviso = avisoDe(candidaturaId, tipo, pontuacao, motivo);
+        transacao.executeWithoutResult(status -> fila.enfileirar(aviso));
+    }
+
+    /**
+     * O mesmo aviso que a triagem monta: destinatario, nome e titulo da vaga
+     * buscados pelos ids que a candidatura guarda.
+     */
+    protected AvisoAoCandidato avisoDe(Long candidaturaId, TipoEmail tipo, int pontuacao, String motivo) {
+        Candidatura candidatura = candidaturas.findById(candidaturaId).orElseThrow();
+        Candidato candidato = candidatos.findById(candidatura.getCandidatoId()).orElseThrow();
+        String tituloDaVaga = vagas.findById(candidatura.getVagaId()).orElseThrow().getTitulo();
+        return new AvisoAoCandidato(candidaturaId, tipo, candidato.getEmail(), candidato.getNome(),
+                tituloDaVaga, pontuacao, motivo);
     }
 
     protected static String assuntoDe(MimeMessage mensagem) throws MessagingException {

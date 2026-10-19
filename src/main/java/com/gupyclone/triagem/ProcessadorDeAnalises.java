@@ -1,15 +1,16 @@
 package com.gupyclone.triagem;
 
-import com.gupyclone.candidaturas.Candidatura;
-import com.gupyclone.candidaturas.CandidaturaRepository;
+import com.gupyclone.candidaturas.Candidaturas;
+import com.gupyclone.candidaturas.DadosParaAnalise;
 import com.gupyclone.candidaturas.StatusCandidatura;
 import com.gupyclone.config.PropriedadesTriagem;
-import com.gupyclone.curriculos.Curriculo;
+import com.gupyclone.notificacoes.AvisoAoCandidato;
 import com.gupyclone.notificacoes.FilaDeEmails;
 import com.gupyclone.notificacoes.TipoEmail;
-import com.gupyclone.vagas.CriterioAceite;
-import com.gupyclone.vagas.Vaga;
-import java.time.OffsetDateTime;
+import com.gupyclone.pessoas.ConsultaDePessoas;
+import com.gupyclone.pessoas.DadosDoCandidato;
+import com.gupyclone.vagas.ConsultaDeVagas;
+import com.gupyclone.vagas.DadosDaVaga;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,13 +22,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Tira candidaturas da fila de analise, decide cada uma e avisa o candidato.
  *
+ * <p>Candidatura, vaga e candidato sao outros agregados: chegam aqui pelas
+ * portas dos modulos donos, em forma de dados. A unica entidade que esta classe
+ * conhece e o {@link AnaliseJob}, que e dela.
+ *
  * <p>A classe nao tem {@code @Transactional} de proposito. Processar um job sao
  * tres passos de naturezas diferentes, e e a separacao deles que da as
  * garantias:
  *
  * <ol>
- *   <li>reivindicar, em transacao propria e curta (lease no banco), e montar o
- *       contexto em outra transacao curta, so de leitura;</li>
+ *   <li>reivindicar, em transacao propria e curta (lease no banco), e reunir o
+ *       que a decisao precisa em outra transacao curta, so de leitura;</li>
  *   <li>analisar <em>fora</em> de qualquer transacao — a estrategia pode ser
  *       uma chamada de rede a uma LLM, e segurar uma conexao do pool enquanto
  *       se espera por ela e o jeito mais rapido de esgotar o pool;</li>
@@ -35,10 +40,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * </ol>
  *
  * <p>O passo 3 e o coracao de "nao duplicar". A conclusao da candidatura e um
- * {@code update ... where status = 'RECEBIDA'}, que devolve 1 para quem chegou
- * primeiro e 0 para os demais, e <strong>so quem recebeu 1 enfileira o
- * e-mail</strong>. Com isso reprocessar e inofensivo: o resultado de uma ou de
- * dez passadas e sempre uma transicao de estado e um aviso.
+ * {@code update ... where status = 'RECEBIDA'}, e a porta devolve verdadeiro
+ * para quem chegou primeiro e falso para os demais: <strong>so quem recebe
+ * verdadeiro enfileira o e-mail</strong>. Com isso reprocessar e inofensivo: o
+ * resultado de uma ou de dez passadas e sempre uma transicao de estado e um
+ * aviso.
  *
  * <p>E "nao perder nenhuma" vem de duas pecas: o job existe desde a mesma
  * transacao que gravou a candidatura, e um job cujo worker morreu volta para
@@ -53,7 +59,10 @@ public class ProcessadorDeAnalises {
     private static final int MAXIMO_DO_ERRO = 1000;
 
     private final AnaliseJobRepository analises;
-    private final CandidaturaRepository candidaturas;
+    private final Candidaturas candidaturas;
+    private final ConsultaDeVagas vagas;
+    private final ConsultaDePessoas pessoas;
+    private final InsumosDaAnalise insumos;
     private final ReivindicadorDeAnalises reivindicador;
     private final AnalisadorDeCandidatura analisador;
     private final FilaDeEmails fila;
@@ -62,7 +71,10 @@ public class ProcessadorDeAnalises {
     private final TransactionTemplate escrita;
 
     public ProcessadorDeAnalises(AnaliseJobRepository analises,
-                                 CandidaturaRepository candidaturas,
+                                 Candidaturas candidaturas,
+                                 ConsultaDeVagas vagas,
+                                 ConsultaDePessoas pessoas,
+                                 InsumosDaAnalise insumos,
                                  ReivindicadorDeAnalises reivindicador,
                                  AnalisadorDeCandidatura analisador,
                                  FilaDeEmails fila,
@@ -70,6 +82,9 @@ public class ProcessadorDeAnalises {
                                  PlatformTransactionManager gerenciadorDeTransacoes) {
         this.analises = analises;
         this.candidaturas = candidaturas;
+        this.vagas = vagas;
+        this.pessoas = pessoas;
+        this.insumos = insumos;
         this.reivindicador = reivindicador;
         this.analisador = analisador;
         this.fila = fila;
@@ -129,8 +144,8 @@ public class ProcessadorDeAnalises {
     }
 
     private boolean processar(Long jobId) {
-        ContextoDaAnalise contexto = leitura.execute(status -> montarContexto(jobId));
-        if (contexto == null) {
+        AnaliseAFazer aFazer = leitura.execute(status -> reunir(jobId));
+        if (aFazer == null) {
             // Ou o job desapareceu junto com a candidatura (cascade), ou a
             // candidatura ja tem status final — uma passada anterior morreu
             // entre concluir a candidatura e concluir o job. Nos dois casos nao
@@ -142,9 +157,10 @@ public class ProcessadorDeAnalises {
 
         ResultadoDaAnalise resultado;
         try {
-            resultado = analisador.analisar(contexto);
+            resultado = analisador.analisar(aFazer.contexto());
         } catch (RuntimeException falha) {
-            log.warn("analise da candidatura {} falhou: {}", contexto.candidaturaId(), descrever(falha));
+            log.warn("analise da candidatura {} falhou: {}",
+                    aFazer.contexto().candidaturaId(), descrever(falha));
             escrita.executeWithoutResult(status -> analises.findById(jobId).ifPresent(job ->
                     job.registrarFalha(descrever(falha),
                             propriedades.maxTentativas(),
@@ -152,85 +168,84 @@ public class ProcessadorDeAnalises {
             return false;
         }
 
-        Integer linhas = escrita.execute(status -> gravar(jobId, contexto, resultado));
-        return linhas != null && linhas == 1;
+        return Boolean.TRUE.equals(escrita.execute(status -> gravar(jobId, aFazer, resultado)));
     }
 
     /**
-     * Tudo o que a analise precisa, lido numa transacao curta.
-     *
-     * <p>O contexto e um record de dados primitivos, e e isso que permite
-     * analisar fora de transacao: nada que o analisador toque e uma associacao
-     * preguicosa esperando uma sessao aberta.
+     * Tudo o que decidir uma candidatura precisa, lido numa transacao curta: o
+     * contexto que o analisador recebe e para quem vai o aviso.
      *
      * @return {@code null} quando nao ha analise a fazer
      */
-    private ContextoDaAnalise montarContexto(Long jobId) {
+    private AnaliseAFazer reunir(Long jobId) {
         AnaliseJob job = analises.findById(jobId).orElse(null);
         if (job == null) {
             return null;
         }
-        Candidatura candidatura = job.getCandidatura();
-        if (candidatura.getStatus().ehFinal()) {
+        DadosParaAnalise candidatura = candidaturas.paraAnalise(job.getCandidaturaId()).orElse(null);
+        if (candidatura == null || candidatura.status().ehFinal()) {
             return null;
         }
-        Vaga vaga = candidatura.getVaga();
-        Curriculo curriculo = candidatura.getCurriculo();
-        List<ContextoDaAnalise.Criterio> criterios = vaga.getCriterios().stream()
-                .map(ProcessadorDeAnalises::comoDado)
-                .toList();
-        return new ContextoDaAnalise(candidatura.getId(),
-                vaga.getId(),
-                vaga.getTitulo(),
-                vaga.getDescricao(),
-                vaga.getPontuacaoMinima(),
-                curriculo.getId(),
-                curriculo.getTexto(),
-                criterios);
+        DadosDaVaga vaga = vagas.porId(candidatura.vagaId()).orElseThrow(() -> ausente(
+                "vaga " + candidatura.vagaId(), candidatura.candidaturaId()));
+        DadosDoCandidato candidato = pessoas.candidato(candidatura.candidatoId()).orElseThrow(() -> ausente(
+                "candidato " + candidatura.candidatoId(), candidatura.candidaturaId()));
+        ContextoDaAnalise contexto = new ContextoDaAnalise(candidatura.candidaturaId(),
+                vaga.id(),
+                vaga.titulo(),
+                vaga.descricao(),
+                vaga.pontuacaoMinima(),
+                candidatura.curriculoId(),
+                insumos.textoDoCurriculo(candidatura.curriculoId()),
+                insumos.criteriosDaVaga(vaga.id()));
+        return new AnaliseAFazer(contexto, candidato);
     }
 
     /**
      * A transacao que decide a candidatura e o aviso: os dois juntos ou nenhum.
      *
-     * @return 1 se foi esta chamada que concluiu a candidatura, 0 se outra
-     *         chegou primeiro
+     * @return true se foi esta chamada que concluiu a candidatura, false se
+     *         outra chegou primeiro
      */
-    private int gravar(Long jobId, ContextoDaAnalise contexto, ResultadoDaAnalise resultado) {
+    private boolean gravar(Long jobId, AnaliseAFazer aFazer, ResultadoDaAnalise resultado) {
+        ContextoDaAnalise contexto = aFazer.contexto();
         StatusCandidatura novoStatus = resultado.aprovado()
                 ? StatusCandidatura.APROVADA
                 : StatusCandidatura.REPROVADA;
-        int linhas = candidaturas.concluir(contexto.candidaturaId(),
+        boolean concluida = candidaturas.concluir(contexto.candidaturaId(),
                 novoStatus,
                 resultado.pontuacao(),
-                resultado.motivo(),
-                OffsetDateTime.now());
+                resultado.motivo());
 
-        if (linhas == 1) {
-            // Carregada DEPOIS do concluir, nunca antes: aquele update em massa
-            // limpa o contexto de persistencia, e uma Candidatura lida antes
-            // chegaria destacada ao redator do e-mail, que estouraria
-            // LazyInitializationException ao ler o candidato e a vaga.
-            Candidatura gerenciada = candidaturas.findById(contexto.candidaturaId())
-                    .orElseThrow(() -> new IllegalStateException(
-                            "candidatura " + contexto.candidaturaId() + " concluida e desaparecida na mesma transacao"));
-            fila.enfileirar(gerenciada, tipoDoAviso(novoStatus), resultado.pontuacao(), resultado.motivo());
+        if (concluida) {
+            // O aviso leva os dados lidos no passo 1. Nao ha entidade em mao
+            // para o update em massa da conclusao destacar, que era a armadilha
+            // de quando a candidatura carregava candidato e vaga como
+            // associacoes.
+            fila.enfileirar(new AvisoAoCandidato(contexto.candidaturaId(),
+                    tipoDoAviso(novoStatus),
+                    aFazer.candidato().email(),
+                    aFazer.candidato().nome(),
+                    contexto.tituloDaVaga(),
+                    resultado.pontuacao(),
+                    resultado.motivo()));
         } else {
             // Outro worker concluiu esta candidatura entre a nossa reivindicacao
-            // e agora. Quem recebeu 1 avisou o candidato; aqui nao se avisa de
+            // e agora. Quem concluiu avisou o candidato; aqui nao se avisa de
             // novo, e e so isso que impede o segundo e-mail.
             log.debug("candidatura {} ja havia sido concluida por outra passada", contexto.candidaturaId());
         }
 
         analises.findById(jobId).ifPresent(AnaliseJob::concluir);
-        return linhas;
+        return concluida;
     }
 
-    private static ContextoDaAnalise.Criterio comoDado(CriterioAceite criterio) {
-        return new ContextoDaAnalise.Criterio(criterio.getId(),
-                criterio.getDescricao(),
-                criterio.getExpressao(),
-                criterio.getPeso(),
-                criterio.isObrigatorio());
+    /** O contexto da analise e o candidato que recebe o aviso, lidos juntos. */
+    private record AnaliseAFazer(ContextoDaAnalise contexto, DadosDoCandidato candidato) {
+    }
+
+    private static IllegalStateException ausente(String oQue, long candidaturaId) {
+        return new IllegalStateException(oQue + " da candidatura " + candidaturaId + " nao existe mais");
     }
 
     private static TipoEmail tipoDoAviso(StatusCandidatura status) {

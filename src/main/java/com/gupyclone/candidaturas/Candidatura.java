@@ -1,17 +1,10 @@
 package com.gupyclone.candidaturas;
 
 import com.gupyclone.comum.EntidadeComId;
-import com.gupyclone.curriculos.Curriculo;
-import com.gupyclone.pessoas.Candidato;
-import com.gupyclone.pessoas.Recrutador;
-import com.gupyclone.vagas.Vaga;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
@@ -21,26 +14,29 @@ import java.time.OffsetDateTime;
  * responsavel (o dono da vaga).
  *
  * <p>Unica por (vaga, candidato) — garantido por constraint no banco.
+ *
+ * <p>Vaga, candidato, curriculo e recrutador sao <em>outros</em> agregados e
+ * entram aqui por id: quem precisa dos dados deles pergunta a porta do modulo
+ * dono. As colunas sao as mesmas de antes — muda o mapeamento, nao o esquema.
  */
 @Entity
 @Table(name = "candidatura")
 public class Candidatura extends EntidadeComId {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "vaga_id", nullable = false)
-    private Vaga vaga;
+    // updatable = false nos quatro: de quem e a candidatura e qual curriculo
+    // ela submeteu sao fatos do instante da inscricao. O unique
+    // (vaga_id, candidato_id) ja diz que trocar isso seria outra candidatura.
+    @Column(name = "vaga_id", nullable = false, updatable = false)
+    private Long vagaId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "candidato_id", nullable = false)
-    private Candidato candidato;
+    @Column(name = "candidato_id", nullable = false, updatable = false)
+    private Long candidatoId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "curriculo_id", nullable = false)
-    private Curriculo curriculo;
+    @Column(name = "curriculo_id", nullable = false, updatable = false)
+    private Long curriculoId;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "recrutador_id", nullable = false)
-    private Recrutador recrutador;
+    @Column(name = "recrutador_id", nullable = false, updatable = false)
+    private Long recrutadorId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -61,11 +57,18 @@ public class Candidatura extends EntidadeComId {
     protected Candidatura() {
     }
 
-    public Candidatura(Vaga vaga, Candidato candidato, Curriculo curriculo) {
-        this.vaga = vaga;
-        this.candidato = candidato;
-        this.curriculo = curriculo;
-        this.recrutador = vaga.getRecrutador();
+    public Candidatura(Long vagaId, Long candidatoId, Long curriculoId, Long recrutadorId) {
+        // Recusa aqui, e nao no banco: faltando um id o insert falharia no not
+        // null e chegaria a quem chamou como violacao de integridade, que o
+        // servico traduz como candidatura duplicada — diagnostico errado.
+        if (vagaId == null || candidatoId == null || curriculoId == null || recrutadorId == null) {
+            throw new IllegalArgumentException(
+                    "candidatura precisa de vaga, candidato, curriculo e recrutador");
+        }
+        this.vagaId = vagaId;
+        this.candidatoId = candidatoId;
+        this.curriculoId = curriculoId;
+        this.recrutadorId = recrutadorId;
         this.status = StatusCandidatura.RECEBIDA;
     }
 
@@ -76,20 +79,20 @@ public class Candidatura extends EntidadeComId {
         }
     }
 
-    public Vaga getVaga() {
-        return vaga;
+    public Long getVagaId() {
+        return vagaId;
     }
 
-    public Candidato getCandidato() {
-        return candidato;
+    public Long getCandidatoId() {
+        return candidatoId;
     }
 
-    public Curriculo getCurriculo() {
-        return curriculo;
+    public Long getCurriculoId() {
+        return curriculoId;
     }
 
-    public Recrutador getRecrutador() {
-        return recrutador;
+    public Long getRecrutadorId() {
+        return recrutadorId;
     }
 
     public StatusCandidatura getStatus() {

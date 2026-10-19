@@ -30,9 +30,10 @@ Três camadas, cada uma suficiente contra um modo de falha diferente:
    `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING id`
    entrega cada linha a um único worker. Se o worker morre, o lease expira e o
    job volta para `PENDENTE`.
-4. **Exatamente uma conclusão** — `CandidaturaRepository.concluir(...)` é
-   `UPDATE ... WHERE id = ? AND status = 'RECEBIDA'`. Retorna 1 para quem
-   chegou primeiro e 0 para os demais. **Só quem recebeu 1 enfileira o e-mail.**
+4. **Exatamente uma conclusão** — concluir é
+   `UPDATE ... WHERE id = ? AND status = 'RECEBIDA'`, e a porta
+   `Candidaturas.concluir(...)` devolve verdadeiro para quem chegou primeiro e
+   falso para os demais. **Só quem recebeu verdadeiro enfileira o e-mail.**
 5. **Não duplicar e-mail** — `unique (candidatura_id, tipo)` em `email_outbox`,
    gravado na mesma transação da conclusão.
 
@@ -61,7 +62,8 @@ com.gupyclone
 ├── vagas/           Vaga, CriterioAceite, StatusVaga + repositórios
 ├── curriculos/      Curriculo, OrigemTexto, TextoExtraido,
 │                    ExtratorDeTextoDePdf, MotorDeOcr, RecebedorDeCurriculos
-├── candidaturas/    Candidatura, StatusCandidatura, repositório com concluir()
+├── candidaturas/    Candidatura (vaga, candidato, currículo e recrutador por
+│                    id), portas Candidaturas e EnfileiramentoDeTriagem
 ├── triagem/         AnalisadorDeCandidatura, ContextoDaAnalise,
 │                    ResultadoDaAnalise, AnaliseJob, ReivindicadorDeAnalises
 ├── notificacoes/    EmailOutbox, FilaDeEmails, RedatorDeEmail,

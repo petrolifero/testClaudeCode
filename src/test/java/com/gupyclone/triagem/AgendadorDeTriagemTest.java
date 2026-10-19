@@ -3,7 +3,7 @@ package com.gupyclone.triagem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import com.gupyclone.candidaturas.Candidatura;
+import com.gupyclone.candidaturas.CandidaturaResposta;
 import com.gupyclone.candidaturas.StatusCandidatura;
 import com.gupyclone.vagas.Vaga;
 import java.time.Duration;
@@ -39,19 +39,19 @@ class AgendadorDeTriagemTest extends TesteDeTriagem {
         assertThat(contexto.getBeanNamesForType(AgendadorDeTriagem.class)).isNotEmpty();
 
         Vaga vaga = publicarVagaDeExemplo(60);
-        Candidatura deCarlos = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
-        Candidatura deJoao = candidatar(joao, vaga.getId(), PDF_QUE_NAO_ATENDE);
+        CandidaturaResposta deCarlos = candidatar(carlos, vaga.getId(), PDF_QUE_ATENDE);
+        CandidaturaResposta deJoao = candidatar(joao, vaga.getId(), PDF_QUE_NAO_ATENDE);
 
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
-            assertThat(candidaturas.findById(deCarlos.getId()).orElseThrow().getStatus())
+            assertThat(candidaturas.findById(deCarlos.id()).orElseThrow().getStatus())
                     .isEqualTo(StatusCandidatura.APROVADA);
-            assertThat(candidaturas.findById(deJoao.getId()).orElseThrow().getStatus())
+            assertThat(candidaturas.findById(deJoao.id()).orElseThrow().getStatus())
                     .isEqualTo(StatusCandidatura.REPROVADA);
             assertThat(analises.countByStatus(StatusJob.CONCLUIDO)).isEqualTo(2);
             assertThat(analises.countByStatus(StatusJob.PENDENTE)).isZero();
             assertThat(analises.countByStatus(StatusJob.PROCESSANDO)).isZero();
-            assertThat(emails.countByCandidaturaId(deCarlos.getId())).isEqualTo(1);
-            assertThat(emails.countByCandidaturaId(deJoao.getId())).isEqualTo(1);
+            assertThat(emails.countByCandidaturaId(deCarlos.id())).isEqualTo(1);
+            assertThat(emails.countByCandidaturaId(deJoao.id())).isEqualTo(1);
         });
 
         // A varredura continua rodando e nao deve mexer no que ja foi decidido.
