@@ -1,7 +1,6 @@
 package com.gupyclone.curriculos;
 
-import com.gupyclone.pessoas.Candidato;
-import com.gupyclone.pessoas.CandidatoRepository;
+import com.gupyclone.pessoas.ConsultaDePessoas;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -18,16 +17,16 @@ public class ServicoDeCurriculos implements RecebedorDeCurriculos {
     /** O mesmo limite da coluna {@code curriculo.nome_arquivo}. */
     private static final int MAXIMO_DO_NOME_DE_ARQUIVO = 255;
 
-    private final CandidatoRepository candidatos;
+    private final ConsultaDePessoas pessoas;
     private final CurriculoRepository curriculos;
     private final ExtratorDeTextoDePdf extrator;
     private final TransactionTemplate transacao;
 
-    public ServicoDeCurriculos(CandidatoRepository candidatos,
+    public ServicoDeCurriculos(ConsultaDePessoas pessoas,
                                CurriculoRepository curriculos,
                                ExtratorDeTextoDePdf extrator,
                                PlatformTransactionManager gerenciadorDeTransacoes) {
-        this.candidatos = candidatos;
+        this.pessoas = pessoas;
         this.curriculos = curriculos;
         this.extrator = extrator;
         this.transacao = new TransactionTemplate(gerenciadorDeTransacoes);
@@ -57,9 +56,14 @@ public class ServicoDeCurriculos implements RecebedorDeCurriculos {
         TextoExtraido extraido = extrator.extrair(pdf);
 
         return transacao.execute(status -> {
-            Candidato candidato = candidatos.findById(candidatoId)
-                    .orElseThrow(() -> new IllegalArgumentException("candidato inexistente: " + candidatoId));
-            return curriculos.save(new Curriculo(candidato, nome, pdf, extraido));
+            // Checagem pela porta, e nao pela chave estrangeira: a violacao de FK
+            // chegaria como DataIntegrityViolationException no flush, sem dizer
+            // que o id do candidato era o errado. Dentro da transacao da
+            // gravacao, como era quando a checagem carregava a entidade.
+            if (pessoas.candidato(candidatoId).isEmpty()) {
+                throw new IllegalArgumentException("candidato inexistente: " + candidatoId);
+            }
+            return curriculos.save(new Curriculo(candidatoId, nome, pdf, extraido));
         });
     }
 

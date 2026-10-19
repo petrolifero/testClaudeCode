@@ -18,7 +18,7 @@ public interface CurriculoRepository extends JpaRepository<Curriculo, Long> {
      */
     @Query("""
             select new com.gupyclone.curriculos.DadosDoCurriculo(
-                       c.id, c.candidato.id, c.nomeArquivo, c.origemTexto, c.paginas)
+                       c.id, c.candidatoId, c.nomeArquivo, c.origemTexto, c.paginas)
               from Curriculo c
              where c.id = :id
             """)

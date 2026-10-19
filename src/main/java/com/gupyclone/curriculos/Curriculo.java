@@ -1,20 +1,19 @@
 package com.gupyclone.curriculos;
 
 import com.gupyclone.comum.EntidadeComId;
-import com.gupyclone.pessoas.Candidato;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 
 /**
  * Curriculo em PDF de um candidato, com o texto ja extraido.
+ *
+ * <p>O candidato entra por id: ele e outro agregado, e quem precisa do nome
+ * dele pergunta a porta de pessoas.
  *
  * <p>A coluna {@code texto_busca} do banco e uma coluna gerada
  * ({@code to_tsvector('portugues_sem_acento', texto)}) e por isso nao e
@@ -24,9 +23,8 @@ import java.time.OffsetDateTime;
 @Table(name = "curriculo")
 public class Curriculo extends EntidadeComId {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "candidato_id", nullable = false)
-    private Candidato candidato;
+    @Column(name = "candidato_id", nullable = false, updatable = false)
+    private Long candidatoId;
 
     @Column(name = "nome_arquivo", nullable = false, length = 255)
     private String nomeArquivo;
@@ -50,8 +48,14 @@ public class Curriculo extends EntidadeComId {
     protected Curriculo() {
     }
 
-    public Curriculo(Candidato candidato, String nomeArquivo, byte[] conteudoPdf, TextoExtraido extraido) {
-        this.candidato = candidato;
+    public Curriculo(Long candidatoId, String nomeArquivo, byte[] conteudoPdf, TextoExtraido extraido) {
+        // Id nulo recusado aqui, e nao so no servico: sem isso o not null da
+        // coluna viraria DataIntegrityViolationException no flush, longe de quem
+        // errou.
+        if (candidatoId == null) {
+            throw new IllegalArgumentException("curriculo exige o id do candidato");
+        }
+        this.candidatoId = candidatoId;
         this.nomeArquivo = nomeArquivo;
         this.conteudoPdf = conteudoPdf;
         this.texto = extraido.texto();
@@ -66,8 +70,8 @@ public class Curriculo extends EntidadeComId {
         }
     }
 
-    public Candidato getCandidato() {
-        return candidato;
+    public Long getCandidatoId() {
+        return candidatoId;
     }
 
     public String getNomeArquivo() {

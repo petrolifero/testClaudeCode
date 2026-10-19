@@ -83,7 +83,7 @@ abstract class TesteDeNotificacoes extends TesteDeIntegracao {
                 OrigemTexto.CAMADA_DE_TEXTO,
                 1);
         Curriculo curriculo = curriculos.save(
-                new Curriculo(candidato, "curriculo-" + chaveDoCandidato + ".pdf", PDF, extraido));
+                new Curriculo(candidato.getId(), "curriculo-" + chaveDoCandidato + ".pdf", PDF, extraido));
         return candidaturas.save(new Candidatura(
                 vaga.getId(), candidato.getId(), curriculo.getId(), ana.getId())).getId();
     }

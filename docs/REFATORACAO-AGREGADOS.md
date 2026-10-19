@@ -136,15 +136,55 @@ outbox não muda.
 
 ## Como saber que deu certo
 
-Além da suíte verde nas duas ordens:
+Além da suíte verde nas duas ordens (183 testes), os números abaixo foram
+**contados** com `grep` sobre `src/main/java`, no commit anterior à refatoração
+(`0aa7c30`) e agora:
 
-| medida | antes | alvo |
-|---|---|---|
-| `Hibernate.initialize` em `src/main` | 4 | **0** |
-| repositórios em `ServicoDeCandidaturas` | 5 | **1** |
-| `candidaturas` importa de `triagem` | 2 | **0** |
-| `notificacoes` importa de `candidaturas` | 5 | **0** |
-| repositório usado fora do seu módulo | sim | **não** |
+| medida | antes | alvo | medido agora |
+|---|---|---|---|
+| `Hibernate.initialize` em `src/main` | 4 | **0** | **0** |
+| repositórios injetados em `ServicoDeCandidaturas` | 5 | **1** | **1** |
+| `candidaturas` importa de `triagem` | 2 | **0** | **0** |
+| `notificacoes` importa de `candidaturas` | 5 | **0** | **0** |
+| arquivos usando repositório de outro pacote | 5 | **0** | **1** |
+| entidade de outro agregado por `@ManyToOne`/`@OneToOne` | 8 | **0** | **0** |
+| ciclos entre pacotes de domínio | 2 | **0** | **0** |
 
-Um teste de arquitetura passa a afirmar essas medidas, para o problema não
-voltar em silêncio.
+Três observações, porque número sem método é estimativa:
+
+1. **`Hibernate.initialize`: 4 chamadas, mas 5 ocorrências de texto.** A quinta
+   era prosa num comentário. Como a medida é textual — e tem de ser, senão a
+   história do defeito reintroduz a palavra sem reintroduzir o defeito — a fase
+   que zerou a conta precisou reescrever aquele comentário. Hoje
+   `grep -rn Hibernate src/main` devolve 3 linhas, todas sobre o ORM e nenhuma
+   com `.initialize`.
+2. **Sobrou 1 repositório fora do pacote**, e não 0:
+   `seguranca/ServicoDePersonas` lê `CandidatoRepository` e
+   `RecrutadorRepository`. Ele resolve persona *por chave* e lista todas, e a
+   porta `ConsultaDePessoas` — congelada acima — só lê por id. Fechar isso é
+   ampliar a porta, o que muda este contrato; está registrado como dívida
+   explícita no teste de arquitetura, arquivo por arquivo, de modo que uma
+   violação **nova** continua falhando e quem consertar esta é obrigado a apagar
+   a entrada.
+3. **As 8 associações entre agregados incluem uma que o contrato não previa.**
+   `Curriculo` referenciava `Candidato` por `@ManyToOne`, e a lista de
+   "Entidades que mudam" não a citava. Quem a encontrou foi o próprio teste de
+   arquitetura ao ser escrito: a regra 4 falhava no primeiro `mvn test`. Virou
+   `Long candidatoId`, no mesmo padrão de `Vaga.recrutadorId`, e com isso a
+   regra vale **sem exceção**.
+
+## O teste que impede o retorno
+
+`src/test/java/com/gupyclone/arquitetura/RegrasDeArquiteturaTest.java`, 7
+testes, sem container e sem biblioteca nova: lê os `.java` de `src/main/java`
+com `java.nio.file` e afirma sobre o texto. Afirma, nesta ordem: o inventário
+lido (nenhuma regra pode passar por ler arquivo nenhum), ausência de
+`Hibernate.initialize`, ausência de ciclo no grafo de domínio, repositório
+preso ao seu pacote, ausência de `@ManyToOne`/`@OneToOne` entre pacotes de
+domínio, e as duas medidas conquistadas (`notificacoes` ⇏ `candidaturas`,
+`candidaturas` ⇏ `triagem`).
+
+Cada regra foi **falsificada** antes de ser aceita: a violação correspondente
+foi reintroduzida em `src/main`, a regra falhou, e a violação foi desfeita. Uma
+regra que não falha quando deveria dá falsa confiança, que é pior que não ter
+regra.

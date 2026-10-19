@@ -50,6 +50,46 @@ e um e-mail. O envio SMTP em si é *at-least-once* (um processo que morra entre 
 `send` e o commit reenvia) — isso está documentado e é o limite honesto de
 entrega por SMTP.
 
+## Agregados e travessia
+
+> Dentro de um agregado, referência **por objeto**. Entre agregados, referência
+> **por id**. Travessia entre agregados **só por porta** do módulo dono.
+
+Agregados: `Vaga` (com seus `CriterioAceite`), `Candidato`, `Recrutador`,
+`Curriculo`, `Candidatura`, `AnaliseJob`, `EmailOutbox`.
+
+Na prática, as três metades da regra:
+
+- **Por objeto, dentro.** `CriterioAceite` é `@OneToMany` dentro de `Vaga`: é
+  parte dela, nasce e morre com ela.
+- **Por id, entre.** `Candidatura` guarda `vagaId`, `candidatoId`,
+  `curriculoId` e `recrutadorId`; `Vaga` guarda `recrutadorId`; `Curriculo`
+  guarda `candidatoId`; `AnaliseJob` e `EmailOutbox` guardam `candidaturaId`.
+  Colunas iguais às de sempre — o esquema já era assim, só o mapeamento estava
+  errado. Id nulo é recusado no construtor, porque sem isso o `not null` da
+  coluna só reclamaria no flush, longe de quem errou.
+- **Por porta, a travessia.** Quem precisa de dado de outro agregado pergunta à
+  porta de leitura do módulo dono — `ConsultaDeVagas`, `ConsultaDePessoas`,
+  `ConsultaDeCurriculos`, `Candidaturas` — que devolve um *record* de dados, sem
+  JPA e sem as escritas do `JpaRepository` de carona. O repositório é detalhe
+  interno do módulo e não sai dele. Quando a dependência precisa ir na direção
+  contrária, quem é chamado **declara** a porta e o outro a **implementa**:
+  `candidaturas` declara `EnfileiramentoDeTriagem` e `triagem` a implementa, e é
+  isso que mantém o grafo de pacotes sem ciclo.
+
+Um `Hibernate.initialize` é o sintoma clássico de que essa fronteira está no
+lugar errado: ele aparece quando se tenta ler, de fora, uma associação de outro
+agregado que chegou destacada (`open-in-view` é `false`). A resposta é mudar o
+desenho, nunca inicializar a associação na mão.
+
+**`RegrasDeArquiteturaTest` afirma isso na suíte.** Lê os `.java` de
+`src/main/java` e falha se voltar um `Hibernate.initialize`, um ciclo entre
+pacotes de domínio, um repositório usado fora do seu pacote ou uma associação
+`@ManyToOne`/`@OneToOne` entre pacotes de domínio. Existe porque o defeito que
+originou essa regra não foi pego por teste nenhum: foi preciso uma pessoa
+estranhar um `Hibernate.initialize` e puxar o fio. Detalhes e números medidos em
+`docs/REFATORACAO-AGREGADOS.md`.
+
 ## Mapa de pacotes
 
 ```

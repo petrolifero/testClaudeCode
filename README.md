@@ -5,7 +5,7 @@ envia o currículo em PDF, uma triagem automática lê o currículo — inclusiv
 quando a página é imagem digitalizada — aprova ou reprova, e avisa o candidato
 por e-mail explicando o motivo.
 
-Java 21 · Spring Boot 4.1.1 · PostgreSQL 16 · **166 testes, nenhum mock**.
+Java 21 · Spring Boot 4.1.1 · PostgreSQL 16 · **183 testes, nenhum mock**.
 
 ## As três pessoas
 
@@ -169,6 +169,19 @@ reais (gerados com PDFBox, nas duas variantes), OCR real (binário do
 Tesseract), SMTP real (GreenMail) e um `com.sun.net.httpserver.HttpServer` de
 verdade para o cliente de LLM. Caminho de falha é provocado de verdade —
 GreenMail parado, LLM apontada para uma porta onde ninguém escuta.
+
+### A arquitetura é testada, não só documentada
+
+> Dentro de um agregado, referência por objeto. Entre agregados, referência por
+> **id**. Travessia entre agregados **só por porta** do módulo dono.
+
+`RegrasDeArquiteturaTest` lê os `.java` de `src/main/java` e falha se voltar um
+`Hibernate.initialize`, um ciclo entre pacotes de domínio, um repositório usado
+fora do seu pacote ou um `@ManyToOne` entre pacotes de domínio. Existe porque o
+defeito que originou essa regra — quatro agregados tratados como um — não foi
+pego por teste nenhum: foi preciso alguém estranhar um `Hibernate.initialize` e
+puxar o fio. Cada regra foi falsificada (violação reintroduzida, regra falhou,
+violação desfeita) antes de entrar. Ver `docs/REFATORACAO-AGREGADOS.md`.
 
 ### Vaga sem critério de aceite aprova com 100
 
