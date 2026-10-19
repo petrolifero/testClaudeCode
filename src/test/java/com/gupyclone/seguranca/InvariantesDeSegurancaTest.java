@@ -147,6 +147,47 @@ class InvariantesDeSegurancaTest extends TesteDeIntegracao {
         assertThat(resposta.statusCode()).isEqualTo(401);
     }
 
+    @Test
+    @DisplayName("entrar como persona inexistente pela pagina volta com recado, nao da 500")
+    void personaInexistentePelaPaginaNaoDa500() {
+        // A interface so oferece quem existe, entao isto exige requisicao
+        // forjada -- e ainda assim nao deve virar "Internal Server Error".
+        var navegador = new NavegadorSimples(enderecoBase());
+        navegador.abrir("/");
+
+        var resposta = navegador.postarComCsrf("/auth/entrar/nao-existe");
+
+        assertThat(resposta.statusCode())
+                .as("o tratador de erros das paginas cobre o caminho HTML")
+                .isEqualTo(302);
+        assertThat(resposta.headers().firstValue("Location").orElse(""))
+                .endsWith("/?aviso=pessoa-desconhecida");
+    }
+
+    @Test
+    @DisplayName("entrar como persona inexistente pela API devolve 404")
+    void personaInexistentePelaApiDevolve404() {
+        var resposta = enviar(HttpRequest.newBuilder(URI.create(enderecoBase() + "/api/auth/entrar/nao-existe"))
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build());
+
+        assertThat(resposta.statusCode()).isEqualTo(404);
+        assertThat(resposta.body()).contains("persona_inexistente");
+    }
+
+    @Test
+    @DisplayName("/api/auth/personas e publico e oferece exatamente as tres pessoas")
+    void personasDisponiveisSaoPublicas() {
+        var resposta = enviar(HttpRequest.newBuilder(URI.create(enderecoBase() + "/api/auth/personas"))
+                .GET().build());
+
+        assertThat(resposta.statusCode()).isEqualTo(200);
+        assertThat(resposta.body())
+                .contains("\"chave\":\"ana\"")
+                .contains("\"chave\":\"carlos\"")
+                .contains("\"chave\":\"joao\"");
+    }
+
     private HttpResponse<String> comCookie(String caminho, String token) {
         return enviar(HttpRequest.newBuilder(URI.create(enderecoBase() + caminho))
                 .header("Cookie", propriedadesJwt.cookie() + "=" + token)

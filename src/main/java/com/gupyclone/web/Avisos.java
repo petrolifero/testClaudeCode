@@ -14,7 +14,8 @@ final class Avisos {
 
     private static final Map<String, String> TEXTOS = Map.of(
             "entre-para-continuar", "Entre como uma das pessoas ao lado para continuar.",
-            "saia-antes-de-entrar-como-outra-pessoa", "Você já está em uma conta. Saia antes de entrar como outra pessoa.");
+            "saia-antes-de-entrar-como-outra-pessoa", "Você já está em uma conta. Saia antes de entrar como outra pessoa.",
+            "pessoa-desconhecida", "Essa pessoa não existe. Escolha uma das do canto superior direito.");
 
     private Avisos() {
     }

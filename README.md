@@ -5,7 +5,7 @@ envia o currículo em PDF, uma triagem automática lê o currículo — inclusiv
 quando a página é imagem digitalizada — aprova ou reprova, e avisa o candidato
 por e-mail explicando o motivo.
 
-Java 21 · Spring Boot 4.1.1 · PostgreSQL 16 · **163 testes, nenhum mock**.
+Java 21 · Spring Boot 4.1.1 · PostgreSQL 16 · **166 testes, nenhum mock**.
 
 ## As três pessoas
 
