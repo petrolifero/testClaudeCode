@@ -234,6 +234,9 @@ Honestamente, o que **não** foi feito:
   duplicidade está.
 - **O corpo do e-mail é texto puro**, sem versão HTML; trocar é escrever outro
   `RedatorDeEmail`.
-- **A estratégia `llm` não reforça critérios obrigatórios programaticamente**
-  (só a nota mínima da vaga): com ela, um critério obrigatório não atendido
-  depende de o modelo obedecer ao prompt.
+- **Com a estratégia `llm`, a nota continua sendo do modelo.** O critério
+  *obrigatório* é reconferido no banco pelo `AnalisadorComVetoDeObrigatorios`,
+  que veta a aprovação — isso não depende do prompt. Já a pontuação e o peso
+  dos critérios desejáveis saem do modelo, então a *ordenação* entre candidatos
+  aprovados depende de ele obedecer ao prompt. Quem quer nota auditável usa a
+  estratégia `full-text-search`, que a calcula por consulta.
