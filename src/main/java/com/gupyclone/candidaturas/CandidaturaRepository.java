@@ -2,7 +2,6 @@ package com.gupyclone.candidaturas;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,12 +11,12 @@ public interface CandidaturaRepository extends JpaRepository<Candidatura, Long> 
 
     boolean existsByVagaIdAndCandidatoId(Long vagaId, Long candidatoId);
 
-    Optional<Candidatura> findByVagaIdAndCandidatoId(Long vagaId, Long candidatoId);
-
-    List<Candidatura> findAllByCandidatoIdOrderByCriadoEmDesc(Long candidatoId);
-
-    List<Candidatura> findAllByVagaIdOrderByCriadoEmDesc(Long vagaId);
-
+    /**
+     * Candidaturas num estado. Nao e chamada em producao: existe para as
+     * asserticoes dos testes de concorrencia, que precisam afirmar "nenhuma
+     * ficou em RECEBIDA". Fica porque e consulta legitima do agregado, nao
+     * atalho para fora dele.
+     */
     List<Candidatura> findAllByStatus(StatusCandidatura status);
 
     /**
