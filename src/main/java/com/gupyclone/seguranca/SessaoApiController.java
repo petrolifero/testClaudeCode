@@ -15,8 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
  * Mesmo fluxo de entrar/sair, em JSON.
  *
  * <p>A API devolve o token para ser usado em {@code Authorization: Bearer} e
- * tambem manda o cookie, de modo que o navegador e os testes compartilham o
- * mesmo caminho de codigo.
+ * <strong>nao</strong> emite cookie de sessao: cookie e do fluxo HTML. O
+ * porque esta no javadoc de {@code entrar} — emitir cookie numa rota publica e
+ * isenta de CSRF deixava outro site trocar a persona da vitima. Sair limpa o
+ * cookie, que e o oposto de emitir.
  */
 @RestController
 public class SessaoApiController {

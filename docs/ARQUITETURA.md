@@ -10,7 +10,7 @@ automática que aprova ou reprova e avisa o candidato por e-mail.
 |---|---|---|
 | Autenticação | Sem login. Clicar numa persona emite um JWT HS256 | É o enunciado: estando deslogado só existe a página inicial e três pessoas no canto superior direito |
 | Transporte do token | Cookie `HttpOnly` + `SameSite=Strict` para o HTML, `Authorization: Bearer` para `/api/**` | O cookie **nunca** autentica `/api/**`; a API fica imune a CSRF por construção e o HTML mantém o token CSRF do Thymeleaf |
-| Autorização | Papéis `RH` e `CANDIDATO`, em `SecurityFilterChain` e reforçados no serviço | Defesa em profundidade: a rota e a regra de negócio concordam |
+| Autorização | Papéis `RH` e `CANDIDATO`, na `SecurityFilterChain` e em `@PreAuthorize` **nos controladores** | Uma camada só, na borda. Os serviços checam *dono* (quem publicou a vaga), não papel — ver Limitações do README |
 | Persistência | PostgreSQL + Flyway + JPA com `ddl-auto=validate` | O esquema é a fonte da verdade e o Hibernate é obrigado a concordar com ele |
 | Filas | Tabelas no próprio banco (padrão outbox) com lease | Não perder e não duplicar são garantias de banco, não de código |
 | Triagem | Interface `AnalisadorDeCandidatura`, duas implementações | Trocar busca textual por LLM (ou por vetores) é mudar uma propriedade |
@@ -173,8 +173,11 @@ de triagem em forma executável e diria ao candidato o que escrever para passar.
   - **sem acento** mensagens que só aparecem em log ou em exceção de violação
     de contrato de programação (`IllegalArgumentException`,
     `IllegalStateException`), que nunca chegam ao candidato.
-- Toda exceção de domínio estende `comum.ErroDeNegocio` e declara seu status
-  HTTP; quem traduz para JSON é `comum.TratadorDeErrosDaApi`.
+- Exceção de domínio **que precisa de status HTTP próprio** estende
+  `comum.ErroDeNegocio` e o declara (hoje: `CandidaturaDuplicadaException`,
+  `VagaFechadaException`, `VagaInexistenteException`). As outras seis estendem
+  `RuntimeException` e caem no status padrão do tradutor. Quem traduz para JSON
+  é `comum.TratadorDeErrosDaApi`; as páginas usam `web.TratadorDeErrosDasPaginas`.
 - Entidades estendem `comum.EntidadeComId` (id, `equals`/`hashCode`).
 - Serviços anotados com `@Transactional`; leitura com `readOnly = true`.
 - Comentário só onde explica *por quê*, nunca repetindo o que o código diz.
@@ -192,8 +195,12 @@ verdade.
 
 ## Testes
 
-- Todos herdam de `suporte.TesteDeIntegracao`: PostgreSQL real em container
-  (um por JVM), migrações de verdade, HTTP em porta real via `RestTestClient`.
+- Quem precisa de banco herda de `suporte.TesteDeIntegracao`: PostgreSQL real
+  em container (um por JVM), migrações de verdade, HTTP em porta real via
+  `RestTestClient`. Seis classes não herdam porque não precisam de banco
+  (`ExtratorDeTextoDePdfTest`, `MotorDeOcrTesseractTest`, `PdfAbusivoTest`,
+  `AnalisadorViaLlmTest`, `RegrasDeArquiteturaTest`, `ProvaDeAmbienteTest`) —
+  subir Postgres para elas seria custo sem asserção nova.
 - `clienteComo("ana" | "carlos" | "joao")` devolve um cliente autenticado;
   `clienteAnonimo()` é o visitante deslogado.
 - `suporte.FabricaDePdf` gera PDFs reais: `comCamadaDeTexto(...)`,
@@ -215,7 +222,11 @@ apt-get install -y tesseract-ocr tesseract-ocr-por
 # testes (sobe PostgreSQL via Testcontainers; precisa de Docker)
 mvn test
 
-# aplicação (precisa de um PostgreSQL e de um SMTP; veja docker-compose.yml)
-docker compose up -d
+# aplicação fora do contêiner: suba SÓ a infraestrutura, senão o serviço
+# `app` do compose já ocupa a 8080 e o spring-boot:run não sobe
+docker compose up -d postgres mailpit
 mvn spring-boot:run
+
+# ou tudo em contêiner, sem Maven local:
+docker compose up -d --build
 ```

@@ -90,8 +90,10 @@ em camadas:
    terminal**: passada a quarentena (`gupy.triagem.quarentena`), ele volta para
    a fila com o orçamento de tentativas renovado. Sem isso, uma
    indisponibilidade de segundos deixaria a candidatura sem decisão para
-   sempre. As tentativas também usam atraso **exponencial**, para que três
-   tentativas cubram minutos em vez de dez segundos.
+   sempre. As tentativas também usam atraso
+   **exponencial** (5s, 10s), o que estica a janela de 10s para 15s — não mais
+   que isso, porque na terceira falha o item já vai para `FALHO`. Quem salva
+   uma queda longa é a quarentena, não o exponencial.
 
 Reprocessar é, portanto, inofensivo em vez de perigoso. Dois testes provam
 isso com concorrência real: 10 threads disputando a mesma vaga, e 12
@@ -234,6 +236,19 @@ Honestamente, o que **não** foi feito:
   duplicidade está.
 - **O corpo do e-mail é texto puro**, sem versão HTML; trocar é escrever outro
   `RedatorDeEmail`.
+- **A autorização por papel vive só na borda.** `@PreAuthorize("hasRole(...)")`
+  está nos controladores, não nos serviços; os serviços checam *dono* (só quem
+  publicou a vaga vê suas candidaturas e pode fechá-la), não papel. Não é
+  defesa em profundidade: um ponto de entrada novo que chame
+  `ServicoDeVagas.publicar` sem repetir a anotação publica sem checar papel.
+  `UsuarioAtual.exigirRh()` e `exigirCandidato()` existem para isso e não têm
+  um único chamador.
+- **Com a estratégia `llm`, o veto só cobre critério obrigatório.** Numa vaga
+  sem nenhum critério obrigatório, `AnalisadorComVetoDeObrigatorios` não tem o
+  que conferir e o veredito do modelo passa inteiro — ou seja, o currículo que
+  pede a própria aprovação volta a funcionar ali. A cerca no prompt continua,
+  mas cerca não é garantia. A estratégia padrão (`full-text-search`) não tem
+  esse flanco porque não lê o currículo como instrução.
 - **Com a estratégia `llm`, a nota continua sendo do modelo.** O critério
   *obrigatório* é reconferido no banco pelo `AnalisadorComVetoDeObrigatorios`,
   que veta a aprovação — isso não depende do prompt. Já a pontuação e o peso
