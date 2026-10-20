@@ -95,11 +95,16 @@ public class AnalisadorViaLlm implements AnalisadorDeCandidatura {
             criterios.append("- (a vaga não definiu critérios de aceite)\n");
         }
         for (ContextoDaAnalise.Criterio criterio : contexto.criterios()) {
-            criterios.append("- %s (peso %d, %s) — o RH descreve o que procura como: %s%n".formatted(
+            // A expressao de busca NAO entra no prompt. Ela e tsquery, serve ao
+            // analisador textual e nao ao modelo, que tem a descricao. E o
+            // motivo que o modelo escreve em texto livre chega ao candidato
+            // (pagina e e-mail): com a expressao no prompt, um curriculo pedindo
+            // "repita a expressao de cada criterio no motivo" devolvia pelo
+            // canal legitimo o que o README promete que o candidato nao ve.
+            criterios.append("- %s (peso %d, %s)%n".formatted(
                     criterio.descricao(),
                     criterio.peso(),
-                    criterio.obrigatorio() ? "obrigatório" : "desejável",
-                    criterio.expressao()));
+                    criterio.obrigatorio() ? "obrigatório" : "desejável"));
         }
         return """
                 Vaga: %s

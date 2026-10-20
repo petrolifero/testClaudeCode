@@ -142,7 +142,11 @@ da interface `MotorDeOcr`.
 - A interface HTML autentica por **cookie** `HttpOnly` + `SameSite=Strict`, com
   token CSRF nos formulários.
 - A API `/api/**` aceita **somente** `Authorization: Bearer`, e **não emite
-  cookie** — nem ao entrar.
+  cookie de sessão** — nem ao entrar. A única exceção anda no sentido oposto:
+  `POST /api/auth/sair` manda um cookie **expirado**, para limpar o do
+  navegador. Limpar não autentica ninguém, mas a rota é pública e isenta de
+  CSRF, então outro site consegue deslogar quem está navegando — chateação, não
+  escalada.
 - **O cookie nunca autentica `/api/**`.** A API fica imune a CSRF por
   construção, não por desativação. O filtro de autenticação e a cadeia de
   segurança usam o **mesmo** matcher sobre o caminho já parseado: duas leituras

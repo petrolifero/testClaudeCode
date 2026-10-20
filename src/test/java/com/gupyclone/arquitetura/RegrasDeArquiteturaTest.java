@@ -36,8 +36,9 @@ import org.junit.jupiter.api.Test;
  * na suite avisava, e portanto nada impedia o problema de voltar.
  *
  * <p>Le o texto dos arquivos de {@code src/main/java} em vez de usar ArchUnit:
- * a biblioteca nao esta no {@code pom.xml}, e para as cinco regras daqui a
- * leitura de texto basta.
+ * a biblioteca nao esta no {@code pom.xml}, e para as regras daqui a leitura
+ * de texto basta. (Nao conte as regras em prosa: o numero derrapa a cada
+ * regra nova, e ja derrapou.)
  */
 class RegrasDeArquiteturaTest {
 
@@ -61,6 +62,29 @@ class RegrasDeArquiteturaTest {
             "seguranca/ServicoDePersonas.java",
             "resolve persona por chave e lista todas; a porta ConsultaDePessoas, "
                     + "congelada no contrato da refatoracao, le somente por id");
+
+    /**
+     * Quem pode montar a resposta <em>completa</em> de vaga, que carrega a
+     * expressao de busca dos criterios. A expressao e o criterio de triagem em
+     * forma executavel: entregue ao candidato, diria o que escrever no
+     * curriculo para passar.
+     *
+     * <p>Nao da para provar posse estaticamente, entao a regra nao finge: ela
+     * obriga todo ponto de chamada a estar declarado aqui, com o motivo pelo
+     * qual quem chama ja e o dono. Um ponto novo falha o teste e tem de se
+     * justificar. E o teste tambem falha se uma entrada daqui deixar de
+     * existir, para a lista nao proteger um chamador que ja foi embora.
+     *
+     * <p>A alternativa segura e {@code paraQuemPergunta(...)}, que apaga a
+     * expressao de quem nao e o RH dono.
+     */
+    private static final Map<String, String> PODE_MONTAR_RESPOSTA_COMPLETA = Map.of(
+            "vagas/VagaController.java",
+            "resposta do POST que acabou de publicar: quem publicou e o dono, por construcao",
+            "web/PaginaDoRhController.java",
+            "lista vagas.doRecrutador(usuario.entidadeId()): por consulta, sao as vagas do proprio");
+
+    private static final Pattern MONTAGEM_COMPLETA = Pattern.compile("\\.completas?\\s*\\(");
 
     private static final Pattern IMPORT_INTERNO =
             Pattern.compile("^import\\s+(?:static\\s+)?com\\.gupyclone\\.([a-z]\\w*)\\.", Pattern.MULTILINE);
@@ -274,6 +298,39 @@ class RegrasDeArquiteturaTest {
     }
 
     /** Arquivos do pacote {@code de} que importam algo do pacote {@code para}. */
+    @Test
+    @DisplayName("resposta completa de vaga so em chamador declarado: a expressao de busca nao vaza por descuido de camada")
+    void respostaCompletaSoEmChamadorDeclarado() {
+        // Esta regra existe porque a invariante estava sendo mantida pelo
+        // template, e nao pelo codigo: as paginas de vagas montavam a resposta
+        // completa, e nenhuma expressao saia no HTML apenas porque nenhum
+        // template a imprimia. Quem amanha acrescentasse a expressao em
+        // vagas.html vazaria sem tocar em nada chamado "seguranca".
+        Map<String, String> chamadores = new TreeMap<>();
+        for (ArquivoJava a : arquivos) {
+            if (MONTAGEM_COMPLETA.matcher(a.texto()).find()) {
+                chamadores.put(a.nome(), a.pacote());
+            }
+        }
+
+        Set<String> naoDeclarados = new TreeSet<>(chamadores.keySet());
+        naoDeclarados.removeAll(PODE_MONTAR_RESPOSTA_COMPLETA.keySet());
+        assertThat(naoDeclarados)
+                .as("Chamador nao declarado de completa(...)/completas(...). Essa resposta carrega"
+                        + " a expressao de busca dos criterios, que o candidato nao pode ver. Use"
+                        + " paraQuemPergunta(vaga, usuario), que apaga a expressao de quem nao e o"
+                        + " RH dono. Se quem chama ja e o dono por construcao, declare o motivo em"
+                        + " PODE_MONTAR_RESPOSTA_COMPLETA. Chamador(es) novo(s): %s", naoDeclarados)
+                .isEmpty();
+
+        Set<String> declaracaoObsoleta = new TreeSet<>(PODE_MONTAR_RESPOSTA_COMPLETA.keySet());
+        declaracaoObsoleta.removeAll(chamadores.keySet());
+        assertThat(declaracaoObsoleta)
+                .as("entrada(s) obsoleta(s) em PODE_MONTAR_RESPOSTA_COMPLETA: "
+                        + "o arquivo nao monta mais a resposta completa; apague a linha")
+                .isEmpty();
+    }
+
     private static List<String> importadoresDe(String de, String para) {
         return arquivos.stream()
                 .filter(a -> a.pacote().equals(de))

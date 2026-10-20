@@ -41,9 +41,18 @@ public class PaginaDeVagasController {
         this.candidaturas = candidaturas;
     }
 
+    /**
+     * Monta a resposta <em>para quem pergunta</em>, e nao a completa.
+     *
+     * <p>Nenhum template imprime a expressao de busca, entao usar a completa
+     * aqui nao vazava nada hoje. Mas a invariante "so o RH dono ve a
+     * expressao" passava a depender de um template continuar calado, e nao do
+     * codigo: quem amanha acrescentasse a expressao em vagas.html vazaria sem
+     * tocar em nada chamado "seguranca". A API ja usava o par certo.
+     */
     @GetMapping("/vagas")
-    public String listar(Model modelo) {
-        modelo.addAttribute("vagas", montador.completas(vagas.abertas()));
+    public String listar(@AuthenticationPrincipal UsuarioAutenticado usuario, Model modelo) {
+        modelo.addAttribute("vagas", montador.paraQuemPergunta(vagas.abertas(), usuario));
         return "vagas";
     }
 
@@ -51,7 +60,7 @@ public class PaginaDeVagasController {
     public String detalhar(@PathVariable Long id,
                            @AuthenticationPrincipal UsuarioAutenticado usuario,
                            Model modelo) {
-        VagaResposta vaga = montador.completa(vagas.porId(id));
+        VagaResposta vaga = montador.paraQuemPergunta(vagas.porId(id), usuario);
         modelo.addAttribute("vaga", vaga);
         // Candidato que ja se inscreveu ve o andamento no lugar do formulario.
         modelo.addAttribute("minhaCandidatura", usuario.ehCandidato()
