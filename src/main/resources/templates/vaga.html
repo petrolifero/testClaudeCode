@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/cabecalho :: cabeca(${vaga.titulo})}"></head>
+<body>
+<header th:replace="~{fragmentos/cabecalho :: topo}"></header>
+
+<main>
+    <div th:replace="~{fragmentos/cabecalho :: recados}"></div>
+
+    <article class="vaga">
+        <h1 th:text="${vaga.titulo}">Título</h1>
+        <p class="meta">
+            <span th:text="${vaga.recrutador.nome}">Recrutador</span>
+            ·
+            <span th:text="${vaga.status}">Status</span>
+            ·
+            <span th:text="'nota mínima ' + ${vaga.pontuacaoMinima}">nota</span>
+        </p>
+        <p class="descricao" th:text="${vaga.descricao}">Descrição</p>
+
+        <h2>Critérios de aceite</h2>
+        <p class="vazio" th:if="${vaga.criterios.isEmpty()}">
+            Esta vaga não definiu critérios de aceite.
+        </p>
+        <table class="criterios" th:unless="${vaga.criterios.isEmpty()}">
+            <thead>
+            <tr><th>Critério</th><th>Peso</th><th>Obrigatório</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="criterio : ${vaga.criterios}">
+                <td th:text="${criterio.descricao}">Descrição</td>
+                <td th:text="${criterio.peso}">Peso</td>
+                <td th:text="${criterio.obrigatorio} ? 'Sim' : 'Não'">Sim</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <!--/* Já se candidatou: mostra o andamento no lugar do formulário. */-->
+        <section class="andamento" th:if="${minhaCandidatura != null}">
+            <h2>Sua candidatura</h2>
+            <p>
+                <span class="selo" th:classappend="${'selo-' + minhaCandidatura.status}"
+                      th:text="${minhaCandidatura.status}">Status</span>
+                <span th:if="${minhaCandidatura.pontuacao != null}"
+                      th:text="' · pontuação ' + ${minhaCandidatura.pontuacao}"></span>
+            </p>
+            <p class="motivo" th:if="${minhaCandidatura.motivo != null}" th:text="${minhaCandidatura.motivo}"></p>
+            <p class="espera" th:if="${minhaCandidatura.motivo == null}">
+                Em análise. Você receberá um e-mail com o resultado.
+            </p>
+        </section>
+
+        <section class="envio"
+                 th:if="${minhaCandidatura == null and cabecalho.ehCandidato and vaga.status.name() == 'ABERTA'}">
+            <h2>Enviar currículo</h2>
+            <p class="dica">
+                PDF com texto selecionável ou PDF digitalizado (a leitura usa OCR quando a
+                página é imagem).
+            </p>
+            <form method="post" enctype="multipart/form-data"
+                  th:action="@{/vagas/{id}/candidatar(id=${vaga.id})}">
+                <input type="file" name="arquivo" accept="application/pdf" required>
+                <button type="submit" class="botao">Candidatar-se</button>
+            </form>
+        </section>
+
+        <p class="vazio" th:if="${cabecalho.ehRh}">
+            Você está como RH. Acompanhe as candidaturas em
+            <a th:href="@{/rh/vagas}">Minhas vagas</a>.
+        </p>
+    </article>
+</main>
+</body>
+</html>

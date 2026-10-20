@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/cabecalho :: cabeca('Minhas vagas')}"></head>
+<body>
+<header th:replace="~{fragmentos/cabecalho :: topo}"></header>
+
+<main>
+    <div th:replace="~{fragmentos/cabecalho :: recados}"></div>
+
+    <h1>Minhas vagas</h1>
+    <p><a class="botao" th:href="@{/rh/vagas/nova}">Publicar nova vaga</a></p>
+
+    <p class="vazio" th:if="${vagas.isEmpty()}">
+        Você ainda não publicou nenhuma vaga.
+    </p>
+
+    <section class="cartao" th:each="item : ${vagas}">
+        <h2>
+            <a th:href="@{/vagas/{id}(id=${item.vaga.id})}" th:text="${item.vaga.titulo}">Título</a>
+        </h2>
+        <p class="meta">
+            <span th:text="${item.vaga.status}">Status</span>
+            ·
+            <span th:text="'nota mínima ' + ${item.vaga.pontuacaoMinima}">nota</span>
+            ·
+            <span th:text="${#lists.size(item.candidaturas)} + ' candidatura(s)'">candidaturas</span>
+        </p>
+
+        <p class="vazio" th:if="${item.candidaturas.isEmpty()}">
+            Nenhuma candidatura ainda.
+        </p>
+        <table class="candidaturas" th:unless="${item.candidaturas.isEmpty()}">
+            <thead>
+            <tr><th>Candidato</th><th>Situação</th><th>Pontuação</th><th>Motivo</th><th>Currículo</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="candidatura : ${item.candidaturas}">
+                <td th:text="${candidatura.nomeDoCandidato}">Candidato</td>
+                <td>
+                    <span class="selo" th:classappend="${'selo-' + candidatura.status}"
+                          th:text="${candidatura.status}">Status</span>
+                </td>
+                <td th:text="${candidatura.pontuacao != null} ? ${candidatura.pontuacao} : '—'">—</td>
+                <td class="motivo" th:text="${candidatura.motivo != null} ? ${candidatura.motivo} : 'Em análise.'">—</td>
+                <td th:text="${candidatura.origemDoTexto.name() == 'OCR'} ? 'digitalizado (OCR)' : 'texto'">texto</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

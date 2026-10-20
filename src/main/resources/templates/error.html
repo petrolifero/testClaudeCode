@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/cabecalho :: cabeca('Erro')}"></head>
+<body>
+<header th:replace="~{fragmentos/cabecalho :: topo}"></header>
+
+<main>
+    <h1 th:text="${status} ?: 'Algo deu errado'">Algo deu errado</h1>
+    <p class="descricao" th:text="${error}">Não foi possível atender a requisição.</p>
+    <p><a class="botao" th:href="@{/}">Voltar ao início</a></p>
+</main>
+</body>
+</html>

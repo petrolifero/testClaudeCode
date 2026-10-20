@@ -1,0 +1,50 @@
+spring:
+  datasource:
+    hikari:
+      # Os testes de concorrencia usam 10 threads simultaneas; com o pool
+      # padrao (10) qualquer outro consumidor esgota o pool e o teste falha com
+      # timeout de conexao em vez de dizer algo sobre o codigo.
+      maximum-pool-size: 20
+      # Mais importante que o maximo: por padrao o Hikari mantem
+      # minimumIdle = maximumPoolSize, ou seja cada contexto Spring em cache
+      # (os testes usam varios, com @TestPropertySource diferentes) ficaria
+      # segurando 20 conexoes ociosas do mesmo PostgreSQL.
+      minimum-idle: 1
+      idle-timeout: 10000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  mail:
+    host: localhost
+    port: 3025
+  thymeleaf:
+    cache: false
+
+gupy:
+  agendamento:
+    ativo: false
+  jwt:
+    segredo: segredo-exclusivo-de-teste-com-mais-de-32-bytes
+    validade: PT1H
+    cookie: gupy_sessao
+  triagem:
+    # Nos testes o processamento e disparado explicitamente, nao pelo agendador.
+    intervalo: PT1H
+    lote: 10
+    max-tentativas: 3
+    espera-apos-falha: PT0S
+    lease: PT5M
+    quarentena: PT1H
+  email:
+    intervalo: PT1H
+    lote: 10
+    max-tentativas: 3
+    espera-apos-falha: PT0S
+    lease: PT5M
+    quarentena: PT1H
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN
+    org.hibernate.SQL: WARN

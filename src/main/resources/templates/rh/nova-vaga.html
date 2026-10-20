@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos/cabecalho :: cabeca('Publicar vaga')}"></head>
+<body>
+<header th:replace="~{fragmentos/cabecalho :: topo}"></header>
+
+<main>
+    <div th:replace="~{fragmentos/cabecalho :: recados}"></div>
+
+    <h1>Publicar vaga</h1>
+
+    <form method="post" th:action="@{/rh/vagas}" class="formulario">
+        <label>
+            Título
+            <input type="text" name="titulo" maxlength="160" required>
+        </label>
+
+        <label>
+            Descrição
+            <textarea name="descricao" rows="5" required></textarea>
+        </label>
+
+        <label>
+            Nota mínima para aprovar (0 a 100)
+            <input type="number" name="pontuacaoMinima" min="0" max="100" value="60" required>
+        </label>
+
+        <h2>Critérios de aceite</h2>
+        <p class="dica">
+            A expressão é o que a triagem procura no currículo. Aceita texto livre
+            (<code>java or jvm</code>, <code>-php</code>, frase entre aspas). Linhas em branco
+            são ignoradas.
+        </p>
+
+        <!--/*
+          Número fixo de linhas em vez de acrescentar linha por JavaScript: a página
+          inteira funciona sem script. A obrigatoriedade é um select, não um checkbox,
+          porque o navegador não envia checkbox desmarcado e isso desalinharia as
+          listas paralelas recebidas no controlador.
+        */-->
+        <fieldset class="criterio" th:each="linha : ${#numbers.sequence(1, linhas)}">
+            <legend th:text="'Critério ' + ${linha}">Critério</legend>
+            <label>
+                Descrição
+                <input type="text" name="criterioDescricao" maxlength="200">
+            </label>
+            <label>
+                Expressão de busca
+                <input type="text" name="criterioExpressao" maxlength="200">
+            </label>
+            <label>
+                Peso (1 a 100)
+                <input type="number" name="criterioPeso" min="1" max="100" value="1">
+            </label>
+            <label>
+                Obrigatório
+                <select name="criterioObrigatorio">
+                    <option value="false">Não</option>
+                    <option value="true">Sim</option>
+                </select>
+            </label>
+        </fieldset>
+
+        <button type="submit" class="botao">Publicar</button>
+    </form>
+</main>
+</body>
+</html>
